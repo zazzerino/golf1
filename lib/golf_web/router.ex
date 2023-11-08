@@ -19,7 +19,9 @@ defmodule GolfWeb.Router do
   scope "/", GolfWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live_session :default, on_mount: GolfWeb.Auth do
+      live "/", HomeLive
+    end
   end
 
   # Other scopes may use custom stacks.
