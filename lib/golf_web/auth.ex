@@ -1,8 +1,8 @@
 defmodule GolfWeb.Auth do
   import Plug.Conn
 
-  @salt "ZGyQachRbPWdgzkTuLKSoMMUTcCnWSqnxqgaPAdq4nJM8IZ3JthI6GtIMZLzEjri"
   @user_cookie "_golf_user"
+  @salt "ZGyQachRbPWdgzkTuLKSoMMUTcCnWSqnxqgaPAdq4nJM8IZ3JthI6GtIMZLzEjri"
 
   def verify_token(token) do
     Phoenix.Token.verify(GolfWeb.Endpoint, @salt, token)
@@ -43,11 +43,17 @@ defmodule GolfWeb.Auth do
         if socket.assigns.user do
           {:cont, socket}
         else
-          {:halt, socket |> Phoenix.LiveView.put_flash(:error, "User not found.")}
+          {:halt,
+           socket
+           |> Phoenix.LiveView.redirect(to: "/")
+           |> Phoenix.LiveView.put_flash(:error, "User #{user_id} not found.")}
         end
 
       _ ->
-        {:halt, socket |> Phoenix.LiveView.put_flash(:error, "Invalid user token.")}
+        {:halt,
+         socket
+         |> Phoenix.LiveView.redirect(to: "/")
+         |> Phoenix.LiveView.put_flash(:error, "Invalid user token.")}
     end
   end
 
