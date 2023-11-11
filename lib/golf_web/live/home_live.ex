@@ -6,7 +6,6 @@ defmodule GolfWeb.HomeLive do
     ~H"""
     <h2>Home</h2>
     <p>Hello <%= @user.name %>(<%= @user.id %>)</p>
-
     <.button phx-click="create_game">
       Create Game
     </.button>

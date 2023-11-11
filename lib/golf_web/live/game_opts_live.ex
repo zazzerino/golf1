@@ -1,6 +1,6 @@
 defmodule GolfWeb.GameOptsLive do
   use GolfWeb, :live_view
-  alias Golf.{Games, GamesDb}
+  alias Golf.Games
 
   @impl true
   def render(assigns) do
@@ -27,7 +27,7 @@ defmodule GolfWeb.GameOptsLive do
 
     {:ok, game} =
       Games.create_game(socket.assigns.user.id, num_rounds)
-      |> GamesDb.upsert_game()
+      |> Games.Db.upsert_game()
 
     {:noreply, redirect(socket, to: ~p"/games/#{game.id}")}
   end

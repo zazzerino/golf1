@@ -1,11 +1,11 @@
-defmodule Golf.GamesDb do
+defmodule Golf.Games.Db do
   import Ecto.Query
   alias Golf.Repo
   alias Golf.Games.{Game, Player, Round, Event}
 
   def get_game(game_id) do
-    events_query = from e in Event, order_by: [desc: :inserted_at]
-    players_query = from p in Player, order_by: p.turn
+    events_query = from(e in Event, order_by: [desc: :inserted_at])
+    players_query = from(p in Player, order_by: p.turn)
 
     Repo.get(Game, game_id)
     |> Repo.preload(rounds: [events: events_query], players: players_query)

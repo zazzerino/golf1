@@ -4,6 +4,7 @@ defmodule Golf.Games.Round do
 
   @states [:init, :flip_2, :take, :hold, :flip, :last_take, :last_hold, :last_flip, :over]
 
+  @derive {Jason.Encoder, only: [:state, :turn, :deck, :table_cards, :hands, :held_card]}
   schema "rounds" do
     belongs_to :game, Golf.Games.Game
     field :state, Ecto.Enum, values: @states

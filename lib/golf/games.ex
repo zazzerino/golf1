@@ -8,6 +8,8 @@ defmodule Golf.Games do
   @num_decks 2
   @hand_size 6
 
+  defguard is_state(game, state) when hd(game.rounds).state == state
+
   def create_game(host_id, num_rounds) do
     player = %Player{user_id: host_id, turn: 0}
 
@@ -28,6 +30,7 @@ defmodule Golf.Games do
   def start_next_round(game) do
     deck = new_deck(@num_decks) |> Enum.shuffle()
 
+    # deal hands
     num_cards = @hand_size * length(game.players)
     {:ok, cards, deck} = deal_from_deck(deck, num_cards)
 
@@ -36,33 +39,36 @@ defmodule Golf.Games do
       |> Enum.map(fn card -> %{"name" => card, "face_up?" => false} end)
       |> Enum.chunk_every(@hand_size)
 
+    # deal table card
+    {:ok, card, deck} = deal_from_deck(deck)
+
     round = %Round{
       game_id: game.id,
       state: :flip_2,
       turn: 0,
       deck: deck,
       hands: hands,
+      table_cards: [card],
       events: []
     }
 
     %Game{game | rounds: [round | game.rounds]}
   end
 
-  def handle_event(game, %Event{action: :flip} = event)
-      when hd(game.rounds).state == :flip_2 do
+  def handle_event(game, %Event{action: :flip} = event) when is_state(game, :flip_2) do
     round = hd(game.rounds)
     index = get_player_index(game, event.player_id)
     hand = Enum.at(round.hands, index)
 
     if num_cards_face_up(hand) < 2 do
       hands =
-        List.update_at(round.hands, index, fn h ->
-          flip_card(h, event.hand_index)
+        List.update_at(round.hands, index, fn hand ->
+          flip_card(hand, event.hand_index)
         end)
 
       all_done_flipping? =
-        Enum.all?(hands, fn h ->
-          num_cards_face_up(h) >= 2
+        Enum.all?(hands, fn hand ->
+          num_cards_face_up(hand) >= 2
         end)
 
       {state, turn} =
@@ -83,9 +89,13 @@ defmodule Golf.Games do
     end
   end
 
+  def playable_cards(_game, _player_id) do
+    []
+  end
+
   defp flip_card(hand, index) do
     List.update_at(hand, index, fn card ->
-      Map.put(card, "face_up?", true)
+      %{card | "face_up?" => true}
     end)
   end
 
@@ -117,9 +127,9 @@ defmodule Golf.Games do
     {:ok, cards, deck}
   end
 
-  # defp deal_from_deck(deck) do
-  #   with {:ok, [card], deck} <- deal_from_deck(deck, 1) do
-  #     {:ok, card, deck}
-  #   end
-  # end
+  defp deal_from_deck(deck) do
+    with {:ok, [card], deck} <- deal_from_deck(deck, 1) do
+      {:ok, card, deck}
+    end
+  end
 end
