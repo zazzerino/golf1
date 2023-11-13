@@ -4,6 +4,11 @@ defmodule Golf.Repo.Migrations.CreateGamesTables do
   def change do
     create table("games") do
       add :host_id, references("users")
+      timestamps()
+    end
+
+    create table("opts") do
+      add :game_id, references("games")
       add :num_rounds, :integer
       timestamps()
     end

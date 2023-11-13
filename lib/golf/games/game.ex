@@ -4,7 +4,7 @@ defmodule Golf.Games.Game do
 
   schema "games" do
     belongs_to :host, Golf.Users.User
-    field :num_rounds, :integer
+    has_one :opts, Golf.Games.Opts
     has_many :players, Golf.Games.Player
     has_many :rounds, Golf.Games.Round
     timestamps()
@@ -12,7 +12,7 @@ defmodule Golf.Games.Game do
 
   def changeset(game, attrs \\ %{}) do
     game
-    |> cast(attrs, [:host_id, :num_rounds])
-    |> validate_required([:host_id, :num_rounds])
+    |> cast(attrs, [:host_id])
+    |> validate_required([:host_id])
   end
 end

@@ -1,8 +1,9 @@
 defmodule GolfWeb.Auth do
   import Plug.Conn
 
-  @user_cookie "_golf_user"
   @salt "ZGyQachRbPWdgzkTuLKSoMMUTcCnWSqnxqgaPAdq4nJM8IZ3JthI6GtIMZLzEjri"
+  @user_cookie "_golf_user"
+  @cookie_opts [same_site: "Lax"]
 
   def verify_token(token) do
     Phoenix.Token.verify(GolfWeb.Endpoint, @salt, token)
@@ -28,7 +29,7 @@ defmodule GolfWeb.Auth do
         conn
         |> assign(:user_token, token)
         |> put_session(:user_token, token)
-        |> put_resp_cookie(@user_cookie, token)
+        |> put_resp_cookie(@user_cookie, token, @cookie_opts)
     end
   end
 

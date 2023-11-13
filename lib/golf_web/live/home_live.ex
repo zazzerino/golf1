@@ -6,7 +6,7 @@ defmodule GolfWeb.HomeLive do
     ~H"""
     <h2>Home</h2>
     <p>Hello <%= @user.name %>(<%= @user.id %>)</p>
-    <.button phx-click="create_game">
+    <.button phx-click="create-game">
       Create Game
     </.button>
     """
@@ -18,7 +18,8 @@ defmodule GolfWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("create_game", _params, socket) do
-    {:noreply, push_navigate(socket, to: ~p"/games/opts")}
+  def handle_event("create-game", _params, socket) do
+    opts_id = Golf.gen_id()
+    {:noreply, push_navigate(socket, to: ~p"/games/opts/#{opts_id}")}
   end
 end

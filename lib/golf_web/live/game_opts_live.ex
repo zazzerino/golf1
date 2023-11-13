@@ -1,34 +1,38 @@
 defmodule GolfWeb.GameOptsLive do
   use GolfWeb, :live_view
-  alias Golf.Games
 
   @impl true
   def render(assigns) do
     ~H"""
     <h2>Game Options</h2>
-
-    <form phx-submit="create_game">
-      <div>
-        <.input label="Number of rounds" name="num_rounds" type="number" min="1" value="1" />
-      </div>
-      <.button type="submit">Start</.button>
+    <h4 class="mt-2">Players</h4>
+    <div :for={user <- @users}>
+      <p>User(id=<%= user.id %>, name=<%= user.name %>)</p>
+    </div>
+    <form class="mt-4" phx-submit="create-game">
+      <.input name="num_rounds" type="number" min="1" value="1" label="Number of rounds" />
+      <.button type="submit">Start Game</.button>
     </form>
     """
   end
 
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok, socket}
+  def mount(%{"id" => room_id}, _session, %{assigns: %{user: user}} = socket) do
+    if connected?(socket) do
+      :ok = Phoenix.PubSub.subscribe(Golf.PubSub, "opts:#{room_id}")
+    end
+
+    {:ok, assign(socket, page_title: "Game Opts", users: [user])}
   end
 
   @impl true
-  def handle_event("create_game", %{"num_rounds" => num_rounds}, socket) do
+  def handle_event(
+        "create-game",
+        %{"num_rounds" => num_rounds},
+        %{assigns: %{user: user}} = socket
+      ) do
     {num_rounds, _} = Integer.parse(num_rounds)
-
-    {:ok, game} =
-      Games.create_game(socket.assigns.user.id, num_rounds)
-      |> Games.Db.upsert_game()
-
+    {:ok, game} = Golf.Games.create_game(user, num_rounds: num_rounds)
     {:noreply, redirect(socket, to: ~p"/games/#{game.id}")}
   end
 end

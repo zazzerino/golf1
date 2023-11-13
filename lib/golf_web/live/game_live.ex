@@ -1,6 +1,7 @@
 defmodule GolfWeb.GameLive do
   use GolfWeb, :live_view
   alias Golf.Games
+  alias Golf.Games.{Game, Round}
 
   @impl true
   def render(assigns) do
@@ -10,7 +11,7 @@ defmodule GolfWeb.GameLive do
       <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
     </div>
     <div>
-      <.button :if={@can_start_round?} phx-click="start_round">
+      <.button :if={@can_start_round?} phx-click="start-round">
         Start Round
       </.button>
     </div>
@@ -36,13 +37,13 @@ defmodule GolfWeb.GameLive do
 
   @impl true
   def handle_info({:load_game, id}, %{assigns: %{user: user}} = socket) do
-    case Games.Db.get_game(id) do
+    case Games.get_game(id) do
       nil ->
         {:noreply, socket |> redirect(to: ~p"/") |> put_flash(:error, "Game #{id} not found.")}
 
       game ->
         user_is_host? = user.id == game.host_id
-        round = List.first(game.rounds)
+        round = Games.current_round(game)
         can_start_round? = user_is_host? && !round
         :ok = Phoenix.PubSub.subscribe(Golf.PubSub, "game:#{id}")
 
@@ -62,13 +63,43 @@ defmodule GolfWeb.GameLive do
   end
 
   @impl true
-  def handle_event("start_round", _params, %{assigns: %{game: game}} = socket) do
-    {:ok, game} =
-      game
-      |> Games.start_next_round()
-      |> Games.Db.upsert_game()
+  def handle_info({:game_event, game, event}, %{assigns: %{user: user}} = socket) do
+    {:noreply,
+     socket
+     |> assign(game: game)
+     |> push_event("game-event", %{"game" => Games.Data.from(game, user.id), "event" => event})}
+  end
 
+  @impl true
+  def handle_event("start-round", _params, %{assigns: %{game: game}} = socket) do
+    {:ok, game} = Games.start_next_round(game)
     :ok = broadcast(game.id, {:round_started, game})
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event(
+        "hand-click",
+        %{"playerId" => player_id, "handIndex" => hand_index},
+        %{assigns: %{game: %Game{rounds: [round | _]} = game}} = socket
+      )
+      when round.state in [:flip_2, :flip] do
+    event = Games.Event.new(round.id, player_id, :flip, hand_index)
+    {:ok, game} = Games.handle_event(game, event)
+    :ok = broadcast(game.id, {:game_event, game, event})
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event(
+        "deck-click",
+        %{"playerId" => player_id},
+        %{assigns: %{game: %Game{rounds: [%Round{id: round_id, state: :take} | _]} = game}} =
+          socket
+      ) do
+    event = Games.Event.new(round_id, player_id, :take_from_deck)
+    {:ok, game} = Games.handle_event(game, event)
+    :ok = broadcast(game.id, {:game_event, game, event})
     {:noreply, socket}
   end
 

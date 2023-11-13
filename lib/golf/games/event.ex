@@ -4,6 +4,7 @@ defmodule Golf.Games.Event do
 
   @actions [:take_from_deck, :take_from_table, :swap, :discard, :flip]
 
+  @derive {Jason.Encoder, only: [:round_id, :player_id, :action, :hand_index]}
   schema "events" do
     belongs_to :round, Golf.Games.Round
     belongs_to :player, Golf.Games.Player

@@ -8,7 +8,7 @@ import {loadTextures, GameContext} from "./game"
 
 loadTextures();
 
-const hooks = {};
+let hooks = {};
 let gameContext;
 
 hooks.GameCanvas = {
@@ -21,6 +21,11 @@ hooks.GameCanvas = {
     this.handleEvent("round-started", data => {
       console.log("round started", data);
       gameContext.onRoundStart(data.game);
+    });
+
+    this.handleEvent("game-event", data => {
+      console.log("game event", data);
+      gameContext.onGameEvent(data.game, data.event);
     });
   }
 }
