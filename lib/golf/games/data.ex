@@ -16,23 +16,21 @@ defmodule Golf.Games.Data do
   ]
 
   def from(game, user_id) do
+    index = Enum.find_index(game.players, &(&1.user_id == user_id))
+    player = index && Enum.at(game.players, index)
     positions = hand_positions(length(game.players))
-    player_index = Enum.find_index(game.players, &(&1.user_id == user_id))
-    player = player_index && Enum.at(game.players, player_index)
-
     round = Golf.Games.current_round(game)
-    hands = round && round.hands
 
     players =
       game.players
-      |> maybe_rotate(player_index)
+      |> maybe_rotate(index)
       |> put_positions(positions)
-      |> maybe_put_hands(hands)
+      |> maybe_put_hands(round && round.hands)
       |> maybe_put_held_card(round && round.held_card)
 
     playable_cards =
-      if player do
-        Golf.Games.playable_cards(game, player.turn)
+      if index do
+        Golf.Games.playable_cards(game, index)
       else
         []
       end
@@ -74,26 +72,19 @@ defmodule Golf.Games.Data do
   defp maybe_put_hands(players, nil), do: players
 
   defp maybe_put_hands(players, hands) do
-    Enum.zip_with(players, hands, fn player, hand ->
-      %{player | hand: hand}
-    end)
+    Enum.zip_with(players, hands, fn p, hand -> %{p | hand: hand} end)
   end
 
   defp put_positions(players, positions) do
-    Enum.zip_with(players, positions, fn player, pos ->
-      %{player | position: pos}
-    end)
+    Enum.zip_with(players, positions, fn p, pos -> %{p | position: pos} end)
   end
 
   defp maybe_put_held_card(players, nil), do: players
 
   defp maybe_put_held_card(players, %{"player_id" => player_id, "card" => card}) do
-    Enum.map(players, fn p ->
-      if p.id == player_id do
-        %{p | held_card: card}
-      else
-        p
-      end
-    end)
+    Enum.map(players, &put_held(&1, player_id, card))
   end
+
+  defp put_held(%{id: id} = p, p_id, card) when id == p_id, do: %{p | held_card: card}
+  defp put_held(player, _, _), do: player
 end

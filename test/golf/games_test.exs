@@ -14,8 +14,8 @@ defmodule Golf.GamesTest do
       %User{name: "bob"}
       |> Users.insert_user()
 
-    {:ok, game} = Games.create_game(user1, %Opts{num_rounds: 2})
-    {:ok, game} = Games.add_player(game, user2)
+    {:ok, game} = Games.create_game(Ecto.UUID.generate(), user1, %Opts{num_rounds: 2})
+    game = Games.add_player(game, user2)
 
     p1 = Enum.find(game.players, &(&1.user_id == user1.id))
     p2 = Enum.find(game.players, &(&1.user_id == user2.id))

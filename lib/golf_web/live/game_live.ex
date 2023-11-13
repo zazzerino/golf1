@@ -6,10 +6,9 @@ defmodule GolfWeb.GameLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <h2>Game <%= @game_id %></h2>
-    <div>
-      <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
-    </div>
+    <h2>Game</h2>
+    <h3><%= String.upcase(@game_id) %></h3>
+    <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
     <div>
       <.button :if={@can_start_round?} phx-click="start-round">
         Start Round
@@ -20,19 +19,11 @@ defmodule GolfWeb.GameLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    with {id, _} <- Integer.parse(id) do
-      if connected?(socket) do
-        send(self(), {:load_game, id})
-      end
-
-      {:ok, assign(socket, page_title: "Game #{id}", game_id: id, can_start_round?: false)}
-    else
-      _ ->
-        {:ok,
-         socket
-         |> redirect(to: ~p"/")
-         |> put_flash(:error, "#{id} is not a valid game id.")}
+    if connected?(socket) do
+      send(self(), {:load_game, id})
     end
+
+    {:ok, assign(socket, page_title: "Game #{id}", game_id: id, can_start_round?: nil)}
   end
 
   @impl true
@@ -44,6 +35,7 @@ defmodule GolfWeb.GameLive do
       game ->
         user_is_host? = user.id == game.host_id
         round = Games.current_round(game)
+        # TODO
         can_start_round? = user_is_host? && !round
         :ok = Phoenix.PubSub.subscribe(Golf.PubSub, "game:#{id}")
 

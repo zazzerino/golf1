@@ -11,19 +11,25 @@ defmodule Golf.Games do
   @num_decks 2
   @hand_size 6
 
-  def get_game(game_id) do
+  def get_game(id) do
     events_query = from(e in Event, order_by: [desc: :id])
     players_query = from(p in Player, order_by: p.turn)
 
-    Repo.get(Game, game_id)
+    Repo.get(Game, id)
     |> Repo.preload([:opts, rounds: [events: events_query], players: players_query])
   end
 
-  def create_game(%User{} = host, opts \\ %Opts{}) do
-    player = %Player{user_id: host.id, turn: 0}
+  def game_exists?(id) do
+    from(g in Game, where: [id: ^id])
+    |> Repo.exists?()
+  end
+
+  def create_game(id, %User{id: host_id}, opts \\ %Opts{}) do
+    player = %Player{user_id: host_id, turn: 0}
 
     %Game{
-      host_id: host.id,
+      id: id,
+      host_id: host_id,
       opts: opts,
       players: [player],
       rounds: []
@@ -32,30 +38,15 @@ defmodule Golf.Games do
     |> Repo.insert()
   end
 
-  # def create_game(%User{} = host, opts \\ []) do
-  #   num_rounds = Keyword.get(opts, :num_rounds, 1)
-  #   player = %Player{user_id: host.id, turn: 0}
-
-  #   %Game{
-  #     host_id: host.id,
-  #     num_rounds: num_rounds,
-  #     players: [player],
-  #     rounds: []
-  #   }
-  #   |> Game.changeset()
-  #   |> Repo.insert()
-  # end
-
-  def add_player(game, %User{} = user) when game.rounds == [] do
+  def add_player(game, %User{id: user_id}) when game.rounds == [] do
     next_turn = length(game.players)
 
     {:ok, player} =
-      %Player{game_id: game.id, user_id: user.id, turn: next_turn}
+      %Player{game_id: game.id, user_id: user_id, turn: next_turn}
       |> Player.changeset()
       |> Repo.insert()
 
-    game = %Game{game | players: game.players ++ [player]}
-    {:ok, game}
+    %Game{game | players: game.players ++ [player]}
   end
 
   def start_next_round(game) do
@@ -115,12 +106,9 @@ defmodule Golf.Games do
           flip_card(hand, event.hand_index)
         end)
 
-      all_done_flipping? =
-        Enum.all?(hands, fn hand ->
-          num_cards_face_up(hand) >= 2
-        end)
-
+      all_done_flipping? = Enum.all?(hands, &(num_cards_face_up(&1) >= 2))
       state = if all_done_flipping?, do: :take, else: :flip_2
+
       {:ok, event} = Repo.insert(Event.changeset(event))
 
       rounds =
@@ -252,3 +240,15 @@ defmodule Golf.Games do
 end
 
 # @card_positions [:deck, :table, :held, :hand_0, :hand_1, :hand_2, :hand_3, :hand_4, :hand_5]
+
+# # https://gist.github.com/danschultzer/99c21ba403fd7f49a26cc40571ff5cce
+# def gen_id() do
+#   min = String.to_integer("100000", 36)
+#   max = String.to_integer("ZZZZZZ", 36)
+
+#   max
+#   |> Kernel.-(min)
+#   |> :rand.uniform()
+#   |> Kernel.+(min)
+#   |> Integer.to_string(36)
+# end

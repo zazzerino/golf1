@@ -2,26 +2,27 @@ defmodule Golf.Repo.Migrations.CreateGamesTables do
   use Ecto.Migration
 
   def change do
-    create table("games") do
+    create table("games", primary_key: false) do
+      add :id, :uuid, primary_key: true, null: false
       add :host_id, references("users")
       timestamps()
     end
 
     create table("opts") do
-      add :game_id, references("games")
+      add :game_id, references("games", type: :uuid)
       add :num_rounds, :integer
       timestamps()
     end
 
     create table("players") do
+      add :game_id, references("games", type: :uuid)
       add :user_id, references("users")
-      add :game_id, references("games")
       add :turn, :integer
       timestamps()
     end
 
     create table("rounds") do
-      add :game_id, references("games")
+      add :game_id, references("games", type: :uuid)
       add :state, :string
       add :turn, :integer
       add :deck, {:array, :string}
