@@ -1,11 +1,11 @@
 defmodule Golf.GamesTest do
-  require Golf.Games
   use Golf.DataCase
-  alias Golf.{Users, Games}
+
   alias Golf.Users.User
+  alias Golf.{Users, Games}
   alias Golf.Games.{Opts, Event}
 
-  test "2p game" do
+  test "two player game" do
     {:ok, user_1} =
       %User{name: "alice"}
       |> Users.insert_user()
@@ -14,48 +14,91 @@ defmodule Golf.GamesTest do
       %User{name: "bob"}
       |> Users.insert_user()
 
-    game_id = Ecto.UUID.generate()
+    id = Games.gen_id()
+    users = [user_1, user_2]
     opts = %Opts{num_rounds: 2}
 
-    {:ok, game} = Games.create_game(game_id, [user_1, user_2], opts)
+    {:ok, game} =
+      Games.create_game(id, users, opts)
 
-    p1 = Enum.find(game.players, &(&1.user_id == user_1.id))
-    p2 = Enum.find(game.players, &(&1.user_id == user_2.id))
+    assert Games.state(game) == :no_rounds
 
-    refute Games.players_turn?(game, p1.turn)
-    refute Games.players_turn?(game, p2.turn)
+    p1 = Enum.at(game.players, 0)
+    p2 = Enum.at(game.players, 1)
 
-    {:ok, game} = Games.start_next_round(game)
+    {:ok, game} = Games.start_round(game)
 
-    assert Games.players_turn?(game, p1.turn)
-    assert Games.players_turn?(game, p2.turn)
+    assert Games.state(game) == :flip_2
 
-    round_id = Games.current_round(game).id
-
-    event = Event.new(round_id, p1.id, :flip, 0)
+    event = Event.new(game, p1, :flip, 0)
     {:ok, game} = Games.handle_event(game, event)
 
-    found_game = Games.get_game(game.id)
+    assert Games.state(game) == :flip_2
+
+    {:ok, found_game} = Games.fetch_game(game.id)
     assert game == found_game
 
-    event = Event.new(round_id, p2.id, :flip, 5)
+    event = Event.new(game, p2, :flip, 5)
     {:ok, game} = Games.handle_event(game, event)
 
-    assert Games.players_turn?(game, p1.turn)
-    assert Games.players_turn?(game, p2.turn)
+    assert Games.state(game) == :flip_2
+    assert Games.can_act?(game, p1)
+    assert Games.can_act?(game, p2)
 
-    event = Event.new(round_id, p2.id, :flip, 4)
+    {:ok, found_game} = Games.fetch_game(game.id)
+    assert game == found_game
+
+    event = Event.new(game, p2, :flip, 4)
     {:ok, game} = Games.handle_event(game, event)
 
-    assert Games.players_turn?(game, p1.turn)
-    refute Games.players_turn?(game, p2.turn)
+    assert Games.state(game) == :flip_2
+    assert Games.can_act?(game, p1)
+    refute Games.can_act?(game, p2)
 
-    event = Event.new(round_id, p1.id, :flip, 1)
+    event = Event.new(game, p1, :flip, 1)
     {:ok, game} = Games.handle_event(game, event)
 
-    assert Games.players_turn?(game, p1.turn)
-    refute Games.players_turn?(game, p2.turn)
+    assert Games.state(game) == :take
+    assert Games.can_act?(game, p1)
+    refute Games.can_act?(game, p2)
 
-    dbg(game)
+    event = Event.new(game, p1, :take_from_deck)
+    {:ok, game} = Games.handle_event(game, event)
+
+    assert Games.state(game) == :hold
+    assert Games.can_act?(game, p1)
+    refute Games.can_act?(game, p2)
+
+    {:ok, found_game} = Games.fetch_game(id)
+    assert game == found_game
+
+    event = Event.new(game, p1, :discard)
+    {:ok, game} = Games.handle_event(game, event)
+
+    assert Games.state(game) == :flip
+    assert Games.can_act?(game, p1)
+    refute Games.can_act?(game, p2)
+
+    {:ok, found_game} = Games.fetch_game(id)
+    assert game == found_game
+
+    event = Event.new(game, p1, :flip, 2)
+    {:ok, game} = Games.handle_event(game, event)
+
+    assert Games.state(game) == :take
+    refute Games.can_act?(game, p1)
+    assert Games.can_act?(game, p2)
+
+    event = Event.new(game, p2, :take_from_table)
+    {:ok, game} = Games.handle_event(game, event)
+
+    assert Games.state(game) == :hold
+    refute Games.can_act?(game, p1)
+    assert Games.can_act?(game, p2)
+
+    event = Event.new(game, p2, :swap, 3)
+    {:ok, game} = Games.handle_event(game, event)
+
+    dbg(Games.current_round(game))
   end
 end

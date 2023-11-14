@@ -14,12 +14,17 @@ defmodule Golf.Repo.Migrations.CreateGamesTables do
       timestamps()
     end
 
+    create unique_index("opts", [:game_id])
+
     create table("players") do
       add :game_id, references("games", type: :uuid)
       add :user_id, references("users")
       add :turn, :integer
       timestamps()
     end
+
+    create unique_index("players", [:game_id, :user_id])
+    create unique_index("players", [:game_id, :turn])
 
     create table("rounds") do
       add :game_id, references("games", type: :uuid)

@@ -1,6 +1,9 @@
 defmodule Golf.Games.Event do
   use Golf.Schema
   import Ecto.Changeset
+  alias Golf.Games.{Game, Round}
+
+  @type action :: :take_from_deck | :take_from_table | :swap | :discard | :flip
 
   @actions [:take_from_deck, :take_from_table, :swap, :discard, :flip]
 
@@ -19,10 +22,17 @@ defmodule Golf.Games.Event do
     |> validate_required([:round_id, :player_id, :action])
   end
 
-  def new(round_id, player_id, action, hand_index \\ nil) do
+  def new(game_or_round, player, action, hand_index \\ nil)
+
+  def new(%Game{rounds: [round | _]}, player, action, hand_index) do
+    new(round, player, action, hand_index)
+  end
+
+  def new(%Round{} = round, player, action, hand_index) do
     %__MODULE__{
-      round_id: round_id,
-      player_id: player_id,
+      round_id: round.id,
+      player_id: player.id,
+      player: player,
       action: action,
       hand_index: hand_index
     }

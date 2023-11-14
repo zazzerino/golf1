@@ -1,5 +1,7 @@
 defmodule GolfWeb.LobbyLive do
   use GolfWeb, :live_view
+  alias Golf.Games
+  alias Golf.Games.Opts
 
   @impl true
   def render(assigns) do
@@ -7,55 +9,103 @@ defmodule GolfWeb.LobbyLive do
     <h2>Lobby</h2>
     <h3>ID: <%= String.upcase(@lobby_id) %></h3>
 
-    <h4 class="mt-2">Users</h4>
-    <div :for={user <- @users}>
-      <p>User(id=<%= user.id %>, name=<%= user.name %>)</p>
+    <div :if={@lobby}>
+      <h4 class="mt-2">Players</h4>
+      <p :for={user <- @lobby.users}>
+        User(id=<%= user.id %>, name=<%= user.name %>)
+      </p>
     </div>
 
-    <form :if={@host?} class="mt-4" phx-submit="create-game">
+    <form :if={@host?} class="mt-4" phx-submit="start-game">
       <.input name="num-rounds" type="number" min="1" value="1" label="Number of rounds" />
       <.button type="submit">Start Game</.button>
     </form>
+
+    <.button :if={@can_join?} phx-click="join-game">
+      Join Game
+    </.button>
+
+    <p :if={@lobby && !@host?}>
+      Waiting for host to start game...
+    </p>
     """
   end
 
   @impl true
-  def mount(%{"id" => id}, _session, %{assigns: %{user: user}} = socket) do
+  def mount(%{"id" => id}, _session, socket) do
     if connected?(socket) do
       send(self(), {:load_lobby, id})
     end
 
     {:ok,
-     assign(socket, page_title: "Lobby", lobby_id: id, users: [user], lobby: nil, host?: nil)}
+     assign(socket,
+       page_title: "Lobby",
+       lobby_id: id,
+       lobby: nil,
+       host?: nil,
+       can_join?: nil
+     )}
   end
 
   @impl true
   def handle_info({:load_lobby, id}, %{assigns: %{user: user}} = socket) do
-    with lobby when is_struct(lobby) <- Golf.Games.get_lobby(id),
-         users when is_list(users) <- Golf.Users.get_users(lobby.user_ids),
-         host? <- user.id == lobby.host_id,
-         :ok <- Phoenix.PubSub.subscribe(Golf.PubSub, "lobby:#{id}") do
-      {:noreply, assign(socket, lobby: lobby, users: users, host?: host?)}
-    else
-      _ ->
-        {:noreply, socket |> redirect(to: ~p"/") |> put_flash(:error, "Lobby #{id} not found.")}
+    case Golf.Games.get_lobby(id) do
+      nil ->
+        {:noreply,
+         socket
+         |> push_navigate(to: ~p"/")
+         |> put_flash(:error, "Lobby #{id} not found.")}
+
+      lobby ->
+        :ok = Phoenix.PubSub.subscribe(Golf.PubSub, "lobby:#{id}")
+
+        {:noreply,
+         assign(socket,
+           lobby: lobby,
+           host?: user.id == lobby.host_id,
+           can_join?: not Enum.any?(lobby.users, &(&1.id == user.id))
+         )}
     end
   end
 
   @impl true
-  def handle_event(
-        "create-game",
-        %{"num-rounds" => num_rounds},
-        %{assigns: %{lobby_id: id, users: users}} = socket
+  def handle_info(
+        {:user_joined, lobby, _new_user},
+        %{assigns: %{user: user}} = socket
       ) do
-    {num_rounds, _} = Integer.parse(num_rounds)
-    opts = %Golf.Games.Opts{num_rounds: num_rounds}
-    {:ok, game} = Golf.Games.create_game(id, users, opts)
-    {:noreply, redirect(socket, to: ~p"/games/#{game.id}")}
+    {:noreply,
+     assign(socket,
+       lobby: lobby,
+       can_join?: not Enum.any?(lobby.users, &(&1.id == user.id))
+     )}
   end
 
   @impl true
-  def handle_event("player-join", _params, socket) do
+  def handle_info(:game_created, %{assigns: %{lobby_id: id}} = socket) do
+    {:noreply, redirect(socket, to: ~p"/games/#{id}")}
+  end
+
+  @impl true
+  def handle_event(
+        "start-game",
+        %{"num-rounds" => num_rounds},
+        %{assigns: %{lobby: lobby}} = socket
+      ) do
+    {num_rounds, _} = Integer.parse(num_rounds)
+    opts = %Opts{num_rounds: num_rounds}
+    {:ok, _} = Games.create_game(lobby.id, lobby.users, opts)
+    :ok = broadcast(lobby.id, :game_created)
+    {:noreply, redirect(socket, to: ~p"/games/#{lobby.id}")}
+  end
+
+  @impl true
+  def handle_event("join-game", _params, %{assigns: %{lobby: lobby, user: user}} = socket) do
+    {:ok, lobby} = Games.add_lobby_user(lobby, user)
+    :ok = broadcast(lobby.id, {:user_joined, lobby, user})
     {:noreply, socket}
+  end
+
+  defp broadcast(id, msg) do
+    Phoenix.PubSub.broadcast(Golf.PubSub, "lobby:#{id}", msg)
   end
 end

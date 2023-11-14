@@ -15,8 +15,6 @@ const CARD_SCALE = 0.75;
 const CARD_WIDTH = CARD_IMG_WIDTH * CARD_SCALE;
 const CARD_HEIGHT = CARD_IMG_HEIGHT * CARD_SCALE;
 
-const DECK_X_INIT = CENTER_X;
-
 const DECK_X = CENTER_X - CARD_WIDTH / 2;
 const DECK_Y = CENTER_Y;
 
@@ -100,8 +98,19 @@ export class GameContext {
 
     switch (event.action) {
       case "flip":
-        this.onFlip(event);
-        break;
+        return this.onFlip(event);
+      
+      case "take_from_deck":
+        return this.onTakeFromDeck(event);
+
+      case "take_from_table":
+        return this.onTakeFromTable(event);
+
+      case "discard":
+        return this.onDiscard(event);
+
+      default:
+        throw new Error("event does not have a valid action:", event);
     }
   }
 
@@ -114,8 +123,7 @@ export class GameContext {
     sprite.texture = this.textures[cardName];
 
     for (let i = 0; i < HAND_SIZE; i++) {
-      const place = `hand_${i}`;
-      if (!this.isPlayable(place)) {
+      if (!this.isPlayable(`hand_${i}`)) {
         makeUnplayable(handSprites[i]);
       }
     }
@@ -127,6 +135,92 @@ export class GameContext {
     if (this.isPlayable("table")) {
       makePlayable(this.sprites.table[0], this.onTableClick.bind(this));
     }
+  }
+
+  onTakeFromDeck(event) {
+    const player = this.game.players.find(p => p.id === event.player_id);
+    const heldSprite = this.addHeldCard(player);
+    
+    const isUsersEvent = player.id === this.game.playerId;
+    if (isUsersEvent) {
+      makePlayable(heldSprite, this.onHeldClick.bind(this));
+      makeUnplayable(this.sprites.deck);
+
+      const tableSprite = this.sprites.table[0];
+      if (tableSprite) {
+        makeUnplayable(tableSprite);
+      }
+
+      const handSprites = this.sprites.hands[player.position];
+      handSprites.forEach((sprite, index) => {
+        makePlayable(sprite, () => this.onHandClick(player.id, index));
+      });
+    }
+  }
+
+  onTakeFromTable(event) {
+    const player = this.game.players.find(p => p.id === event.player_id);
+    const heldSprite = this.addHeldCard(player);
+
+    const tableSprite = this.sprites.table.shift();
+    tableSprite.visible = false;
+
+    const isUsersEvent = player.id === this.game.playerId;
+    if (isUsersEvent) {
+      makeUnplayable(tableSprite);
+      makeUnplayable(this.sprites.deck);
+
+      makePlayable(heldSprite, this.onHeldClick.bind(this));
+
+      const handSprites = this.sprites.hands[player.position];
+      handSprites.forEach((sprite, index) => {
+        makePlayable(sprite, () => this.onHandClick(player.id, index));
+      });
+    }
+  }
+
+  onDiscard(event) {
+    const player = this.game.players.find(p => p.id === event.player_id);
+    this.addTableCards();
+
+    this.sprites.held.visible = false;
+    this.sprites.held = null;
+
+    const handSprites = this.sprites.hands[player.position];
+    const flipAll = this.game.state === "over";
+
+    handSprites.forEach((sprite, index) => {
+      if (!this.isPlayable(`hand_${index}`)) {
+        makeUnplayable(sprite);
+      }
+
+      if (flipAll) {
+        const cardName = player.hand[index].name;
+        sprite.texture = this.textures[cardName];
+      }
+    });
+
+    if (this.isPlayable("deck")) {
+      makePlayable(this.sprites.deck, this.onDeckClick.bind(this));
+    }
+  }
+
+  // client events
+
+  onDeckClick() {
+    this.pushEvent("deck-click", {playerId: this.game.playerId});
+  }
+
+  onTableClick() {
+    this.pushEvent("table-click", {playerId: this.game.playerId});
+  }
+
+  onHandClick(playerId, handIndex) {
+    this.pushEvent("hand-click", {playerId, handIndex});
+  }
+
+  onHeldClick() {
+    this.pushEvent("held-click", {playerId: this.game.playerId});
   }
 
   // sprites
@@ -165,7 +259,7 @@ export class GameContext {
     const card1 = this.game.tableCards[1];
 
     if (card1) {
-      this.addTableCards(card1);
+      this.addTableCard(card1);
     }
 
     if (card0) {
@@ -215,24 +309,8 @@ export class GameContext {
     if (this.isPlayable("held")) {
       makePlayable(sprite, this.onHeldClick.bind(this));
     }
-  }
 
-  // client events
-
-  onDeckClick() {
-    this.pushEvent("deck-click", {playerId: this.game.playerId})
-  }
-
-  onTableClick() {
-    console.log("table clicked");
-  }
-
-  onHandClick(playerId, handIndex) {
-    this.pushEvent("hand-click", {playerId, handIndex});
-  }
-
-  onHeldClick() {
-    console.log("held clicked");
+    return sprite;
   }
 
   isPlayable(place) {
@@ -272,7 +350,7 @@ function makeUnplayable(sprite) {
 // sprite coords
 
 function deckX(state) {
-  return state ? DECK_X : DECK_X_INIT;
+  return state ? DECK_X : CENTER_X;
 }
 
 function playerRotation(position) {

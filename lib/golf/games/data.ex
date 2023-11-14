@@ -20,17 +20,18 @@ defmodule Golf.Games.Data do
     player = index && Enum.at(game.players, index)
     positions = hand_positions(length(game.players))
     round = Golf.Games.current_round(game)
+    hands = if round, do: maybe_rotate(round.hands, index)
 
     players =
       game.players
       |> maybe_rotate(index)
       |> put_positions(positions)
-      |> maybe_put_hands(round && round.hands)
-      |> maybe_put_held_card(round && round.held_card)
+      |> put_hands(hands)
+      |> put_held_card(round && round.held_card)
 
     playable_cards =
-      if index do
-        Golf.Games.playable_cards(game, index)
+      if round && player do
+        Golf.Games.playable_cards(round, player)
       else
         []
       end
@@ -56,11 +57,8 @@ defmodule Golf.Games.Data do
     end
   end
 
-  # don't do anything if n is 0 or nil
-  defp maybe_rotate(list, 0), do: list
-  defp maybe_rotate(list, nil), do: list
+  defp maybe_rotate(list, n) when n in [0, nil], do: list
 
-  # otherwise rotate the list n elements
   defp maybe_rotate(list, n) do
     list
     |> Stream.cycle()
@@ -69,9 +67,9 @@ defmodule Golf.Games.Data do
     |> Enum.to_list()
   end
 
-  defp maybe_put_hands(players, nil), do: players
+  defp put_hands(players, nil), do: players
 
-  defp maybe_put_hands(players, hands) do
+  defp put_hands(players, hands) do
     Enum.zip_with(players, hands, fn p, hand -> %{p | hand: hand} end)
   end
 
@@ -79,12 +77,12 @@ defmodule Golf.Games.Data do
     Enum.zip_with(players, positions, fn p, pos -> %{p | position: pos} end)
   end
 
-  defp maybe_put_held_card(players, nil), do: players
+  defp put_held_card(players, nil), do: players
 
-  defp maybe_put_held_card(players, %{"player_id" => player_id, "card" => card}) do
-    Enum.map(players, &put_held(&1, player_id, card))
+  defp put_held_card(players, %{"player_id" => player_id, "name" => card}) do
+    Enum.map(players, &do_put_held(&1, player_id, card))
   end
 
-  defp put_held(%{id: id} = p, p_id, card) when id == p_id, do: %{p | heldCard: card}
-  defp put_held(player, _, _), do: player
+  defp do_put_held(%{id: id} = p, p_id, card) when id == p_id, do: %{p | heldCard: card}
+  defp do_put_held(player, _, _), do: player
 end

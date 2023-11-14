@@ -6,13 +6,13 @@ defmodule Golf.Games.Lobby do
 
   schema "lobbies" do
     belongs_to :host, Golf.Users.User
-    field :user_ids, {:array, :integer}
+    many_to_many :users, Golf.Users.User, join_through: Golf.UserLobby
     timestamps()
   end
 
   def changeset(lobby, attrs \\ %{}) do
     lobby
-    |> cast(attrs, [:id, :host_id, :user_ids])
-    |> validate_required([:id, :host_id, :user_ids])
+    |> cast(attrs, [:id, :host_id])
+    |> validate_required([:id, :host_id])
   end
 end
