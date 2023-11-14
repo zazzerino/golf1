@@ -109,6 +109,7 @@ export class GameContext {
     const player = this.game.players.find(p => p.id === event.player_id);
     const cardName = player.hand[event.hand_index]["name"];
     const handSprites = this.sprites.hands[player.position];
+
     const sprite = handSprites[event.hand_index];
     sprite.texture = this.textures[cardName];
 
@@ -139,7 +140,7 @@ export class GameContext {
       for (const player of this.game.players) {
         this.addHand(player);
 
-        if (player.held_card) {
+        if (player.heldCard) {
           this.addHeldCard(player);
         }
       }
@@ -150,6 +151,7 @@ export class GameContext {
     const x = deckX(this.game.state);
     const texture = this.textures[DECK_CARD];
     const sprite = makeCardSprite(texture, x, DECK_Y);
+
     this.sprites.deck = sprite;
     this.stage.addChild(sprite);
 
@@ -178,6 +180,7 @@ export class GameContext {
   addTableCard(card) {
     const texture = this.textures[card];
     const sprite = makeCardSprite(texture, TABLE_CARD_X, TABLE_CARD_Y);
+    
     this.sprites.table.unshift(sprite);
     this.stage.addChild(sprite);
     return sprite;
@@ -190,21 +193,22 @@ export class GameContext {
       const texture = this.textures[name];
       const coord = handCardCoord(player.position, i);
       const sprite = makeCardSprite(texture, coord.x, coord.y);
-      const place = `hand_${i}`;
-
-      if (player.id == this.game.playerId && this.isPlayable(place)) {
-        makePlayable(sprite, () => this.onHandClick(player.id, i));
-      }
 
       this.sprites.hands[player.position][i] = sprite;
       this.stage.addChild(sprite);
+
+      const isPlayersCard = player.id === this.game.playerId;
+      if (isPlayersCard && this.isPlayable(`hand_${i}`)) {
+        makePlayable(sprite, () => this.onHandClick(player.id, i));
+      }
     }
   }
 
   addHeldCard(player) {
-    const texture = this.textures[player.held_card];
+    const texture = this.textures[player.heldCard];
     const coord = heldCardCoord(player.position);
     const sprite = makeCardSprite(texture, coord.x, coord.y, coord.rotation);
+    
     this.sprites.held = sprite;
     this.stage.addChild(sprite);
 

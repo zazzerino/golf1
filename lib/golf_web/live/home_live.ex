@@ -6,13 +6,15 @@ defmodule GolfWeb.HomeLive do
     ~H"""
     <h2>Home</h2>
     <p>Hello <%= @user.name %>(id=<%= @user.id %>)</p>
-    <.button class="mt-4 mb-4" phx-click="create-game">
+
+    <.button class="mt-4 mb-4" phx-click="create-lobby">
       Create Game
     </.button>
-    <form phx-submit="join-game">
-      <.input name="game-id" label="Game ID" value="" required />
+
+    <.form for={%{}} action={~p"/lobby/join"}>
+      <.input name="id" label="Game ID" value="" required />
       <.button>Join Game</.button>
-    </form>
+    </.form>
     """
   end
 
@@ -22,19 +24,9 @@ defmodule GolfWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("create-game", _params, socket) do
+  def handle_event("create-lobby", _params, %{assigns: %{user: user}} = socket) do
     id = Ecto.UUID.generate()
-    {:noreply, push_navigate(socket, to: ~p"/games/new/#{id}")}
-  end
-
-  @impl true
-  def handle_event("join-game", %{"game-id" => id}, socket) do
-    with {:ok, id} <- Ecto.UUID.cast(id),
-         true <- Golf.Games.game_exists?(id) do
-      {:noreply, socket}
-    else
-      _ ->
-        {:noreply, socket |> put_flash(:error, "Game #{id} not found.")}
-    end
+    {:ok, _} = Golf.Games.create_lobby(id, user.id)
+    {:noreply, push_navigate(socket, to: ~p"/lobby/#{id}")}
   end
 end

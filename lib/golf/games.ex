@@ -2,7 +2,7 @@ defmodule Golf.Games do
   import Ecto.Query
   alias Golf.Repo
   alias Golf.Users.User
-  alias Golf.Games.{Game, Event, Player, Round, Opts}
+  alias Golf.Games.{Game, Event, Player, Round, Opts, Lobby}
 
   @card_names for rank <- ~w(A 2 3 4 5 6 7 8 9 T J Q K),
                   suit <- ~w(C D H S),
@@ -10,6 +10,26 @@ defmodule Golf.Games do
 
   @num_decks 2
   @hand_size 6
+
+  def get_lobby(id) do
+    Repo.get(Lobby, id)
+  end
+
+  def create_lobby(id, host_id) do
+    %Lobby{id: id, host_id: host_id, user_ids: [host_id]}
+    |> Lobby.changeset()
+    |> Repo.insert()
+  end
+
+  def add_lobby_user(%Lobby{} = lobby, %User{id: user_id}) do
+    if user_id in lobby.user_ids do
+      {:error, :already_joined}
+    else
+      lobby
+      |> Lobby.changeset(%{user_ids: lobby.user_ids ++ [user_id]})
+      |> Repo.update()
+    end
+  end
 
   def get_game(id) do
     events_query = from(e in Event, order_by: [desc: :id])
@@ -24,29 +44,21 @@ defmodule Golf.Games do
     |> Repo.exists?()
   end
 
-  def create_game(id, %User{id: host_id}, opts \\ %Opts{}) do
-    player = %Player{user_id: host_id, turn: 0}
+  def create_game(id, [%User{} = host | _] = users, opts \\ %Opts{}) do
+    players =
+      users
+      |> Enum.with_index()
+      |> Enum.map(fn {user, index} -> %Player{user_id: user.id, turn: index} end)
 
     %Game{
       id: id,
-      host_id: host_id,
+      host_id: host.id,
       opts: opts,
-      players: [player],
+      players: players,
       rounds: []
     }
     |> Game.changeset()
     |> Repo.insert()
-  end
-
-  def add_player(game, %User{id: user_id}) when game.rounds == [] do
-    next_turn = length(game.players)
-
-    {:ok, player} =
-      %Player{game_id: game.id, user_id: user_id, turn: next_turn}
-      |> Player.changeset()
-      |> Repo.insert()
-
-    %Game{game | players: game.players ++ [player]}
   end
 
   def start_next_round(game) do
@@ -100,11 +112,7 @@ defmodule Golf.Games do
       ) do
     Repo.transaction(fn ->
       index = Enum.find_index(game.players, &(&1.id == event.player_id))
-
-      hands =
-        List.update_at(round.hands, index, fn hand ->
-          flip_card(hand, event.hand_index)
-        end)
+      hands = List.update_at(round.hands, index, &flip_card(&1, event.hand_index))
 
       all_done_flipping? = Enum.all?(hands, &(num_cards_face_up(&1) >= 2))
       state = if all_done_flipping?, do: :take, else: :flip_2

@@ -85,6 +85,6 @@ defmodule Golf.Games.Data do
     Enum.map(players, &put_held(&1, player_id, card))
   end
 
-  defp put_held(%{id: id} = p, p_id, card) when id == p_id, do: %{p | held_card: card}
+  defp put_held(%{id: id} = p, p_id, card) when id == p_id, do: %{p | heldCard: card}
   defp put_held(player, _, _), do: player
 end

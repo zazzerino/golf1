@@ -3,22 +3,24 @@ defmodule Golf.GamesTest do
   use Golf.DataCase
   alias Golf.{Users, Games}
   alias Golf.Users.User
-  alias Golf.Games.{Game, Opts, Player, Event}
+  alias Golf.Games.{Opts, Event}
 
   test "2p game" do
-    {:ok, user1} =
+    {:ok, user_1} =
       %User{name: "alice"}
       |> Users.insert_user()
 
-    {:ok, user2} =
+    {:ok, user_2} =
       %User{name: "bob"}
       |> Users.insert_user()
 
-    {:ok, game} = Games.create_game(Ecto.UUID.generate(), user1, %Opts{num_rounds: 2})
-    game = Games.add_player(game, user2)
+    game_id = Ecto.UUID.generate()
+    opts = %Opts{num_rounds: 2}
 
-    p1 = Enum.find(game.players, &(&1.user_id == user1.id))
-    p2 = Enum.find(game.players, &(&1.user_id == user2.id))
+    {:ok, game} = Games.create_game(game_id, [user_1, user_2], opts)
+
+    p1 = Enum.find(game.players, &(&1.user_id == user_1.id))
+    p2 = Enum.find(game.players, &(&1.user_id == user_2.id))
 
     refute Games.players_turn?(game, p1.turn)
     refute Games.players_turn?(game, p2.turn)

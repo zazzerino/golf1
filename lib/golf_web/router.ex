@@ -12,19 +12,22 @@ defmodule GolfWeb.Router do
     plug :put_user_token
   end
 
-  pipeline :api do
-    plug :accepts, ["json"]
-  end
-
   scope "/", GolfWeb do
     pipe_through :browser
 
     live_session :default, on_mount: GolfWeb.Auth do
       live "/", HomeLive
-      live "/games/new/:id", NewGameLive
+      live "/lobby/:id", LobbyLive
       live "/games/:id", GameLive
     end
+
+    get "/lobby/join/:id", GameController, :join
+    post "/lobby/join", GameController, :join
   end
+
+  # pipeline :api do
+  #   plug :accepts, ["json"]
+  # end
 
   # Other scopes may use custom stacks.
   # scope "/api", GolfWeb do

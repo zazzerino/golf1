@@ -9,8 +9,9 @@ defmodule GolfWeb.GameLive do
     <h2>Game</h2>
     <h3><%= String.upcase(@game_id) %></h3>
     <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
+
     <div>
-      <.button :if={@can_start_round?} phx-click="start-round">
+      <.button :if={@can_start?} phx-click="start-round">
         Start Round
       </.button>
     </div>
@@ -23,7 +24,7 @@ defmodule GolfWeb.GameLive do
       send(self(), {:load_game, id})
     end
 
-    {:ok, assign(socket, page_title: "Game #{id}", game_id: id, can_start_round?: nil)}
+    {:ok, assign(socket, page_title: "Game", game_id: id, can_start?: nil)}
   end
 
   @impl true
@@ -36,12 +37,12 @@ defmodule GolfWeb.GameLive do
         user_is_host? = user.id == game.host_id
         round = Games.current_round(game)
         # TODO
-        can_start_round? = user_is_host? && !round
+        can_start? = user_is_host? && !round
         :ok = Phoenix.PubSub.subscribe(Golf.PubSub, "game:#{id}")
 
         {:noreply,
          socket
-         |> assign(game: game, can_start_round?: can_start_round?)
+         |> assign(game: game, can_start?: can_start?)
          |> push_event("game-loaded", %{"game" => Games.Data.from(game, user.id)})}
     end
   end
@@ -50,7 +51,7 @@ defmodule GolfWeb.GameLive do
   def handle_info({:round_started, game}, %{assigns: %{user: user}} = socket) do
     {:noreply,
      socket
-     |> assign(game: game, can_start_round?: false)
+     |> assign(game: game, can_start?: false)
      |> push_event("round-started", %{"game" => Games.Data.from(game, user.id)})}
   end
 
