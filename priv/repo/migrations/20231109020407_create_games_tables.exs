@@ -34,6 +34,7 @@ defmodule Golf.Repo.Migrations.CreateGamesTables do
       add :table_cards, {:array, :string}
       add :hands, {:array, {:array, :map}}
       add :held_card, :map
+      add :flipped?, :boolean
       timestamps()
     end
 

@@ -2,7 +2,7 @@ defmodule Golf.Games.Round do
   use Golf.Schema
   import Ecto.Changeset
 
-  @states [:init, :flip_2, :take, :hold, :flip, :last_take, :last_hold, :last_flip, :over]
+  @states [:flip_2, :take, :hold, :flip, :over]
 
   @derive {Jason.Encoder, only: [:state, :turn, :deck, :table_cards, :hands, :held_card]}
   schema "rounds" do
@@ -14,6 +14,7 @@ defmodule Golf.Games.Round do
     field :table_cards, {:array, :string}, default: []
     field :hands, {:array, {:array, :map}}, default: []
     field :held_card, :map
+    field :flipped?, :boolean, default: false
 
     has_many :events, Golf.Games.Event
 
@@ -23,7 +24,7 @@ defmodule Golf.Games.Round do
 
   def changeset(round, attrs \\ %{}) do
     round
-    |> cast(attrs, [:game_id, :state, :turn, :deck, :table_cards, :hands, :held_card])
-    |> validate_required([:game_id, :state, :turn, :deck, :table_cards, :hands])
+    |> cast(attrs, [:game_id, :state, :turn, :deck, :table_cards, :hands, :held_card, :flipped?])
+    |> validate_required([:game_id, :state, :turn, :deck, :table_cards, :hands, :flipped?])
   end
 end

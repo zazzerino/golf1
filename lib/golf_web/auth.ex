@@ -2,6 +2,7 @@ defmodule GolfWeb.Auth do
   import Plug.Conn
 
   @salt "ZGyQachRbPWdgzkTuLKSoMMUTcCnWSqnxqgaPAdq4nJM8IZ3JthI6GtIMZLzEjri"
+
   @user_cookie "_golf_user"
   @cookie_opts [same_site: "Lax"]
 
