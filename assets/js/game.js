@@ -109,6 +109,9 @@ export class GameContext {
       case "discard":
         return this.onDiscard(event);
 
+      case "swap":
+        return this.onSwap(event);
+
       default:
         throw new Error("event does not have a valid action:", event);
     }
@@ -116,6 +119,8 @@ export class GameContext {
 
   onFlip(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
+    if (player == null) throw new Error("player is null on flip");
+
     const cardName = player.hand[event.hand_index]["name"];
     const handSprites = this.sprites.hands[player.position];
 
@@ -139,6 +144,8 @@ export class GameContext {
 
   onTakeFromDeck(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
+    if (player == null) throw new Error("player is null on take from deck");
+
     const heldSprite = this.addHeldCard(player);
     
     const isUsersEvent = player.id === this.game.playerId;
@@ -165,11 +172,9 @@ export class GameContext {
     const tableSprite = this.sprites.table.shift();
     tableSprite.visible = false;
 
-    const isUsersEvent = player.id === this.game.playerId;
-    if (isUsersEvent) {
+    if (player.id === this.game.playerId) {
       makeUnplayable(tableSprite);
       makeUnplayable(this.sprites.deck);
-
       makePlayable(heldSprite, this.onHeldClick.bind(this));
 
       const handSprites = this.sprites.hands[player.position];
@@ -202,6 +207,68 @@ export class GameContext {
 
     if (this.isPlayable("deck")) {
       makePlayable(this.sprites.deck, this.onDeckClick.bind(this));
+    }
+  }
+
+  onSwap(event) {
+    const player = this.game.players.find(p => p.id === event.player_id);
+    if (!player) throw new Error("player is null on swap");
+
+    const handCard = player.hand[event.hand_index].name;
+    const handSprites = this.sprites.hands[player.position]
+    
+    const handSprite = handSprites[event.hand_index];
+    handSprite.texture = this.textures[handCard];
+
+    this.sprites.held.visible = false;
+    this.sprites.held = null;
+
+    const tableCard = this.game.tableCards[0];
+    const firstTexture = this.textures[tableCard];
+
+    let tableSprite = this.sprites.table[0];
+    if (tableSprite) {
+      tableSprite.texture = firstTexture;
+
+      const secondCard = this.game.tableCards[1];
+      if (secondCard) {
+        const secondSprite = this.sprites.table[1];
+        const secondTexture = this.textures[secondCard];
+
+        if (secondSprite) {
+          secondSprite.texture = this.textures[secondTexture];
+        } else {
+          const sprite = makeCardSprite(secondTexture, TABLE_CARD_X, TABLE_CARD_Y);
+          this.sprites.table[1] = sprite;
+          this.stage.addChild(sprite);
+
+          // redraw the first table card so it's on top
+          tableSprite.visible = false;
+          makeUnplayable(tableSprite);
+          tableSprite = makeCardSprite(firstTexture, TABLE_CARD_X, TABLE_CARD_Y);
+          this.sprites.table[0] = tableSprite;
+          this.stage.addChild(tableSprite);
+        }
+      }
+    } else {
+      tableSprite = makeCardSprite(firstTexture, TABLE_CARD_X, TABLE_CARD_Y);
+      this.sprites.table[0] = tableSprite;
+      this.stage.addChild(tableSprite);
+    }
+
+    const isUsersEvent = player.id === this.game.playerId;
+    if (isUsersEvent) {
+      for (const sprite of handSprites) {
+        makeUnplayable(sprite);
+      }
+    }
+
+    if (this.isPlayable("deck")) {
+      makePlayable(this.sprites.deck, this.onDeckClick.bind(this));
+    }
+
+    if (this.isPlayable("table")) {
+      makePlayable(tableSprite, this.onTableClick.bind(this));
     }
   }
 
@@ -258,6 +325,7 @@ export class GameContext {
     const card0 = this.game.tableCards[0];
     const card1 = this.game.tableCards[1];
 
+    // add the second card first, so it's on bottom
     if (card1) {
       this.addTableCard(card1);
     }

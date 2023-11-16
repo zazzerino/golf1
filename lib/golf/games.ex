@@ -78,7 +78,8 @@ defmodule Golf.Games do
 
       game ->
         num_players = length(game.players)
-        {:ok, %Game{game | rounds: Enum.map(game.rounds, &%Round{&1 | num_players: num_players})}}
+        rounds = Enum.map(game.rounds, &%Round{&1 | num_players: num_players})
+        {:ok, %Game{game | rounds: rounds}}
     end
   end
 
@@ -173,9 +174,13 @@ defmodule Golf.Games do
 
   @spec can_act?(%Game{} | %Round{}, %Player{}) :: boolean()
 
+  def can_act?(%Game{rounds: []}), do: false
+
   def can_act?(%Game{rounds: [round | _]}, player) do
     can_act?(round, player)
   end
+
+  def can_act?(%Round{state: :over}, _), do: false
 
   def can_act?(%Round{state: :flip_2} = round, player) do
     hand = Enum.at(round.hands, player.turn)
@@ -220,14 +225,12 @@ defmodule Golf.Games do
     hands =
       List.update_at(round.hands, event.player.turn, &flip_card_at_index(&1, event.hand_index))
 
-    hand = Enum.at(hands, event.player.turn)
-
     {state, turn} =
       cond do
         Enum.all?(hands, &all_face_up?/1) ->
           {:over, round.turn}
 
-        all_face_up?(hand) ->
+        all_face_up?(Enum.at(hands, event.player.turn)) ->
           {:last_take, round.turn + 1}
 
         true ->
@@ -364,12 +367,12 @@ defmodule Golf.Games do
   def playable_cards(round, player) do
     if can_act?(round, player) do
       case round.state do
+        :take ->
+          [:deck, :table]
+
         :flip ->
           hand = Enum.at(round.hands, player.turn)
           face_down_cards(hand)
-
-        :take ->
-          [:deck, :table]
 
         :last_take ->
           hand = Enum.at(round.hands, player.turn)
@@ -377,9 +380,6 @@ defmodule Golf.Games do
 
         s when s in [:hold, :last_hold] ->
           [:held, :hand_0, :hand_1, :hand_2, :hand_3, :hand_4, :hand_5]
-
-        _ ->
-          []
       end
     else
       []

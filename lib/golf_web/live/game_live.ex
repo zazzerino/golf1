@@ -1,7 +1,7 @@
 defmodule GolfWeb.GameLive do
   use GolfWeb, :live_view
   alias Golf.Games
-  alias Golf.Games.Event
+  alias Golf.Games.{Event, Player}
 
   @impl true
   def render(assigns) do
@@ -40,7 +40,7 @@ defmodule GolfWeb.GameLive do
       {:ok, game} ->
         host? = user.id == game.host_id
         can_start? = host? && !Games.current_round(game)
-        :ok = Phoenix.PubSub.subscribe(Golf.PubSub, "game:#{id}")
+        :ok = Phoenix.PubSub.subscribe(Golf.PubSub, topic(id))
 
         {:noreply,
          socket
@@ -104,7 +104,7 @@ defmodule GolfWeb.GameLive do
   end
 
   defp handle_game_event(game, place, player_id, hand_index \\ nil) do
-    player = Enum.find(game.players, &(&1.id == player_id))
+    %Player{} = player = Enum.find(game.players, &(&1.id == player_id))
     action = current_action(Games.state(game), place)
     event = Event.new(game, player, action, hand_index)
 
@@ -126,12 +126,26 @@ defmodule GolfWeb.GameLive do
       {:take, "table"} ->
         :take_from_table
 
+      {:last_take, "deck"} ->
+        :take_from_deck
+
+      {:last_take, "table"} ->
+        :take_from_table
+
       {:hold, "held"} ->
         :discard
+
+      {:last_hold, "held"} ->
+        :discard
+
+      {:hold, "hand"} ->
+        :swap
     end
   end
 
+  defp topic(id), do: "game:#{id}"
+
   defp broadcast(game_id, msg) do
-    Phoenix.PubSub.broadcast(Golf.PubSub, "game:#{game_id}", msg)
+    Phoenix.PubSub.broadcast(Golf.PubSub, topic(game_id), msg)
   end
 end
