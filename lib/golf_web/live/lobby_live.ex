@@ -93,9 +93,9 @@ defmodule GolfWeb.LobbyLive do
       ) do
     {num_rounds, _} = Integer.parse(num_rounds)
     opts = %Opts{num_rounds: num_rounds}
-    {:ok, _} = Games.create_game(lobby.id, lobby.users, opts)
+    {:ok, game} = Games.create_game(lobby.id, lobby.users, opts)
     :ok = broadcast(lobby.id, :game_created)
-    {:noreply, redirect(socket, to: ~p"/games/#{lobby.id}")}
+    {:noreply, redirect(socket, to: ~p"/games/#{game.id}")}
   end
 
   @impl true

@@ -7,12 +7,10 @@ To start your Phoenix server:
 
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+## Game rules
 
-## Learn more
-
-  * Official website: https://www.phoenixframework.org/
-  * Guides: https://hexdocs.pm/phoenix/overview.html
-  * Docs: https://hexdocs.pm/phoenix
-  * Forum: https://elixirforum.com/c/phoenix-forum
-  * Source: https://github.com/phoenixframework/phoenix
+The goal of the game is to get the lowest score possible.
+At the start of a round, each player flips two cards.
+After everyone has flipped, the host user goes first.
+Once a player has flipped all their cards, every other player has one remaining turn.
+After this turn, all their cards will be flipped over.

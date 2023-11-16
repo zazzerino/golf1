@@ -7,6 +7,7 @@ defmodule Golf.Games.Data do
   defstruct [
     :id,
     :state,
+    :isFlipped,
     :turn,
     :deck,
     :tableCards,
@@ -39,6 +40,7 @@ defmodule Golf.Games.Data do
     %__MODULE__{
       id: game.id,
       state: round && round.state,
+      isFlipped: round && round.flipped?,
       turn: round && round.turn,
       deck: (round && round.deck) || [],
       tableCards: (round && round.table_cards) || [],

@@ -7,7 +7,6 @@ defmodule Golf.Games do
   alias Golf.Games.{Game, Event, Player, Round, Opts, Lobby}
 
   @type id :: Ecto.UUID.t()
-  @type card_name :: binary()
 
   @card_names for rank <- ~w(A 2 3 4 5 6 7 8 9 T J Q K),
                   suit <- ~w(C D H S),
@@ -20,21 +19,24 @@ defmodule Golf.Games do
 
   def gen_id(), do: Ecto.UUID.generate()
 
+  @doc """
+  Sorts users by the time they joined the lobby.
+  """
+  def lobby_users_query(lobby_id) do
+    from(u in User,
+      join: ul in UserLobby,
+      on: u.id == ul.user_id,
+      where: ^lobby_id == ul.lobby_id,
+      order_by: ul.inserted_at,
+      select: u
+    )
+  end
+
   @spec get_lobby(id) :: %Lobby{} | nil
 
   def get_lobby(id) do
-    # sort users by the time they joined the lobby
-    users_query =
-      from(u in User,
-        join: ul in UserLobby,
-        on: u.id == ul.user_id,
-        where: ^id == ul.lobby_id,
-        order_by: ul.inserted_at,
-        select: u
-      )
-
     Repo.get(Lobby, id)
-    |> Repo.preload(users: users_query)
+    |> Repo.preload(users: lobby_users_query(id))
   end
 
   @spec create_lobby(id, %User{}) :: {:ok, %Lobby{}} | {:error, any}
@@ -57,6 +59,7 @@ defmodule Golf.Games do
     else
       lobby
       |> Lobby.changeset()
+      # TODO
       |> Ecto.Changeset.put_assoc(:users, lobby.users ++ [user])
       |> Repo.update()
     end
@@ -68,11 +71,9 @@ defmodule Golf.Games do
     players_query = from(p in Player, order_by: p.turn)
     events_query = from(e in Event, order_by: [desc: :id])
 
-    game =
-      Repo.get(Game, id)
-      |> Repo.preload([:opts, rounds: [events: {events_query, [:player]}], players: players_query])
-
-    case game do
+    Repo.get(Game, id)
+    |> Repo.preload([:opts, rounds: [events: {events_query, [:player]}], players: players_query])
+    |> case do
       nil ->
         {:error, :not_found}
 
@@ -83,12 +84,12 @@ defmodule Golf.Games do
     end
   end
 
-  def state(%Game{rounds: []}), do: :no_rounds
-  def state(%Game{rounds: [round | _]}), do: round.state
+  def current_state(%Game{rounds: []}), do: :no_rounds
+  def current_state(%Game{rounds: [round | _]}), do: round.state
 
-  @spec insert_round_event(%Round{}, %Event{}, map) :: {:ok, %Round{}} | {:error, any}
+  @spec update_round(%Round{}, %Event{}, map) :: {:ok, %Round{}} | {:error, any}
 
-  defp insert_round_event(round, event, round_changes) do
+  defp update_round(round, event, round_changes) do
     Repo.transaction(fn ->
       {:ok, event} =
         event
@@ -203,7 +204,8 @@ defmodule Golf.Games do
 
   def handle_event(%Game{rounds: [round | _]} = game, event) do
     with {:ok, round} <- handle_round_event(round, event) do
-      {:ok, %Game{game | rounds: List.replace_at(game.rounds, 0, round)}}
+      rounds = List.replace_at(game.rounds, 0, round)
+      {:ok, %Game{game | rounds: rounds}}
     end
   end
 
@@ -214,36 +216,46 @@ defmodule Golf.Games do
       List.update_at(
         round.hands,
         event.player.turn,
-        &flip_card_at_index(&1, event.hand_index)
+        &flip_card_at(&1, event.hand_index)
       )
 
-    state = if Enum.all?(hands, &two_face_up?/1), do: :take, else: :flip_2
-    insert_round_event(round, event, %{state: state, hands: hands})
+    state =
+      if Enum.all?(hands, &min_two_face_up?/1) do
+        :take
+      else
+        :flip_2
+      end
+
+    update_round(round, event, %{state: state, hands: hands})
   end
 
   def handle_round_event(%Round{state: :flip} = round, %Event{action: :flip} = event) do
-    hands =
-      List.update_at(round.hands, event.player.turn, &flip_card_at_index(&1, event.hand_index))
+    hand =
+      round.hands
+      |> Enum.at(event.player.turn)
+      |> flip_card_at(event.hand_index)
 
-    {state, turn} =
+    hands = List.replace_at(round.hands, event.player.turn, hand)
+
+    {state, turn, flipped?} =
       cond do
         Enum.all?(hands, &all_face_up?/1) ->
-          {:over, round.turn}
+          {:over, round.turn, true}
 
-        all_face_up?(Enum.at(hands, event.player.turn)) ->
-          {:last_take, round.turn + 1}
+        all_face_up?(hand) ->
+          {:take, round.turn + 1, true}
 
         true ->
-          {:take, round.turn + 1}
+          {:take, round.turn + 1, round.flipped?}
       end
 
-    insert_round_event(round, event, %{state: state, turn: turn, hands: hands})
+    update_round(round, event, %{state: state, turn: turn, hands: hands, flipped?: flipped?})
   end
 
   def handle_round_event(%Round{state: :take} = round, %Event{action: :take_from_deck} = event) do
     {:ok, card, deck} = deal_from_deck(round.deck)
 
-    insert_round_event(round, event, %{
+    update_round(round, event, %{
       state: :hold,
       deck: deck,
       held_card: %{"player_id" => event.player.id, "name" => card}
@@ -253,7 +265,7 @@ defmodule Golf.Games do
   def handle_round_event(%Round{state: :take} = round, %Event{action: :take_from_table} = event) do
     [card | table_cards] = round.table_cards
 
-    insert_round_event(round, event, %{
+    update_round(round, event, %{
       state: :hold,
       table_cards: table_cards,
       held_card: %{"player_id" => event.player.id, "name" => card}
@@ -261,94 +273,85 @@ defmodule Golf.Games do
   end
 
   def handle_round_event(
-        %Round{state: :last_take} = round,
-        %Event{action: :take_from_deck} = event
+        %Round{state: :hold, flipped?: false} = round,
+        %Event{action: :discard} = event
       ) do
-    {:ok, card, deck} = deal_from_deck(round.deck)
+    hand = Enum.at(round.hands, event.player.turn)
 
-    insert_round_event(round, event, %{
-      state: :last_hold,
-      deck: deck,
-      held_card: %{"player_id" => event.player.id, "name" => card}
+    {state, turn, flipped?} =
+      cond do
+        all_face_up?(hand) ->
+          {:take, round.turn + 1, true}
+
+        one_face_down?(hand) ->
+          {:take, round.turn + 1, false}
+
+        true ->
+          {:flip, round.turn, false}
+      end
+
+    update_round(round, event, %{
+      state: state,
+      turn: turn,
+      held_card: nil,
+      table_cards: [round.held_card["name"] | round.table_cards],
+      flipped?: flipped?
     })
   end
 
   def handle_round_event(
-        %Round{state: :last_take} = round,
-        %Event{action: :take_from_table} = event
+        %Round{state: :hold, flipped?: true} = round,
+        %Event{action: :discard} = event
       ) do
-    [card | table_cards] = round.table_cards
-
-    insert_round_event(round, event, %{
-      state: :last_hold,
-      table_cards: table_cards,
-      held_card: %{"player_id" => event.player.id, "name" => card}
-    })
-  end
-
-  def handle_round_event(%Round{state: :hold} = round, %Event{action: :discard} = event) do
-    hand = Enum.at(round.hands, event.player.turn)
-
-    {state, turn} =
-      if one_face_down?(hand) do
-        {:take, round.turn + 1}
-      else
-        {:flip, round.turn}
-      end
-
-    insert_round_event(round, event, %{
-      state: state,
-      turn: turn,
-      held_card: nil,
-      table_cards: [round.held_card["name"] | round.table_cards]
-    })
-  end
-
-  def handle_round_event(%Round{state: :hold} = round, %Event{action: :swap} = event) do
-    {card, hand} =
-      round.hands
-      |> Enum.at(event.player.turn)
-      |> swap_card(event.hand_index, round.held_card["name"])
-
-    hands = List.replace_at(round.hands, event.player.turn, hand)
-
-    {state, turn} =
-      cond do
-        Enum.all?(hands, &all_face_up?/1) ->
-          {:over, round.turn}
-
-        all_face_up?(hand) ->
-          {:last_take, round.turn + 1}
-
-        true ->
-          {:take, round.turn + 1}
-      end
-
-    insert_round_event(round, event, %{
-      state: state,
-      turn: turn,
-      held_card: nil,
-      hands: hands,
-      table_cards: [card | round.table_cards]
-    })
-  end
-
-  def handle_round_event(%Round{state: :last_hold} = round, %Event{action: :discard} = event) do
     hands = List.update_at(round.hands, event.player.turn, &flip_all/1)
 
     {state, turn} =
       if Enum.all?(hands, &all_face_up?/1) do
         {:over, round.turn}
       else
-        {:last_take, round.turn + 1}
+        {:take, round.turn + 1}
       end
 
-    insert_round_event(round, event, %{
+    update_round(round, event, %{
       state: state,
       turn: turn,
       hands: hands,
       held_card: nil,
       table_cards: [round.held_card["name"] | round.table_cards]
+    })
+  end
+
+  def handle_round_event(
+        %Round{state: :hold} = round,
+        %Event{action: :swap} = event
+      ) do
+    {card, hand} =
+      round.hands
+      |> Enum.at(event.player.turn)
+      |> maybe_flip_all(round.flipped?)
+      |> swap_card(event.hand_index, round.held_card["name"])
+
+    hands = List.replace_at(round.hands, event.player.turn, hand)
+
+    {state, turn, flipped?} =
+      cond do
+        Enum.all?(hands, &all_face_up?/1) ->
+          {:over, round.turn, true}
+
+        all_face_up?(hand) ->
+          {:take, round.turn + 1, true}
+
+        true ->
+          {:take, round.turn + 1, round.flipped?}
+      end
+
+    update_round(round, event, %{
+      state: state,
+      turn: turn,
+      held_card: nil,
+      hands: hands,
+      table_cards: [card | round.table_cards],
+      flipped?: flipped?
     })
   end
 
@@ -366,37 +369,32 @@ defmodule Golf.Games do
 
   def playable_cards(round, player) do
     if can_act?(round, player) do
-      case round.state do
-        :take ->
-          [:deck, :table]
-
-        :flip ->
-          hand = Enum.at(round.hands, player.turn)
-          face_down_cards(hand)
-
-        :last_take ->
-          hand = Enum.at(round.hands, player.turn)
-          [:deck, :table] ++ face_down_cards(hand)
-
-        s when s in [:hold, :last_hold] ->
-          [:held, :hand_0, :hand_1, :hand_2, :hand_3, :hand_4, :hand_5]
-      end
+      hand = Enum.at(round.hands, player.turn)
+      places(round.state, round.flipped?, hand)
     else
       []
     end
   end
 
+  defp places(:take, true, hand), do: [:deck, :table] ++ face_down_cards(hand)
+  defp places(:take, false, _), do: [:deck, :table]
+  defp places(:flip, _, hand), do: face_down_cards(hand)
+  defp places(:hold, _, _), do: [:held, :hand_0, :hand_1, :hand_2, :hand_3, :hand_4, :hand_5]
+
   defp flip_card(card) do
     %{card | "face_up?" => true}
   end
 
-  defp flip_card_at_index(hand, index) do
+  defp flip_card_at(hand, index) do
     List.update_at(hand, index, &flip_card/1)
   end
 
   defp flip_all(hand) do
     Enum.map(hand, &flip_card/1)
   end
+
+  defp maybe_flip_all(hand, true), do: flip_all(hand)
+  defp maybe_flip_all(hand, _), do: hand
 
   defp swap_card(hand, index, new_card) do
     old_card = Enum.at(hand, index)["name"]
@@ -416,7 +414,7 @@ defmodule Golf.Games do
     num_cards_face_up(hand) == @hand_size - 1
   end
 
-  defp two_face_up?(hand) do
+  defp min_two_face_up?(hand) do
     num_cards_face_up(hand) >= 2
   end
 
@@ -427,15 +425,14 @@ defmodule Golf.Games do
     |> Enum.map(fn {_, index} -> String.to_existing_atom("hand_#{index}") end)
   end
 
-  @spec new_deck(integer) :: list(card_name())
+  @spec new_deck(integer) :: list
   defp new_deck(1), do: @card_names
 
   defp new_deck(n) when n > 1 do
     @card_names ++ new_deck(n - 1)
   end
 
-  @spec deal_from_deck(list(card_name), integer) ::
-          {:ok, list(card_name()), list(card_name())} | {:error, any}
+  @spec deal_from_deck(list, integer) :: {:ok, list, list} | {:error, any}
   defp deal_from_deck([], _) do
     {:error, :empty_deck}
   end
@@ -449,7 +446,7 @@ defmodule Golf.Games do
     {:ok, cards, deck}
   end
 
-  @spec deal_from_deck(list(card_name)) :: {:ok, card_name, list(card_name)} | {:error, any}
+  @spec deal_from_deck(list) :: {:ok, binary, list} | {:error, any}
   defp deal_from_deck(deck) do
     with {:ok, [card], deck} <- deal_from_deck(deck, 1) do
       {:ok, card, deck}

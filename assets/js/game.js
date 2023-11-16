@@ -256,6 +256,13 @@ export class GameContext {
       this.stage.addChild(tableSprite);
     }
 
+    if (this.game.isFlipped) {
+      handSprites.forEach((sprite, i) => {
+        const card = player.hand[i]["name"];
+        sprite.texture = this.textures[card];
+      });
+    }
+
     const isUsersEvent = player.id === this.game.playerId;
     if (isUsersEvent) {
       for (const sprite of handSprites) {

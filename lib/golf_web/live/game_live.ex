@@ -8,9 +8,7 @@ defmodule GolfWeb.GameLive do
     ~H"""
     <h2>Game</h2>
     <h3><%= String.upcase(@game_id) %></h3>
-
     <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
-
     <.button :if={@can_start?} class="mt-2" phx-click="start-round">
       Start Round
     </.button>
@@ -29,7 +27,6 @@ defmodule GolfWeb.GameLive do
        game_id: id,
        game: nil,
        player: nil,
-       host?: nil,
        can_start?: nil
      )}
   end
@@ -44,7 +41,7 @@ defmodule GolfWeb.GameLive do
 
         {:noreply,
          socket
-         |> assign(game: game, host?: host?, can_start?: can_start?)
+         |> assign(game: game, can_start?: can_start?)
          |> push_event("game-loaded", %{"game" => Games.Data.from(game, user.id)})}
 
       _ ->
@@ -105,43 +102,21 @@ defmodule GolfWeb.GameLive do
 
   defp handle_game_event(game, place, player_id, hand_index \\ nil) do
     %Player{} = player = Enum.find(game.players, &(&1.id == player_id))
-    action = current_action(Games.state(game), place)
-    event = Event.new(game, player, action, hand_index)
 
+    action =
+      Games.current_state(game)
+      |> current_action(place)
+
+    event = Event.new(game, player, action, hand_index)
     {:ok, game} = Games.handle_event(game, event)
     :ok = broadcast(game.id, {:game_event, game, event})
   end
 
-  defp current_action(state, place) do
-    case {state, place} do
-      {:flip_2, "hand"} ->
-        :flip
-
-      {:flip, "hand"} ->
-        :flip
-
-      {:take, "deck"} ->
-        :take_from_deck
-
-      {:take, "table"} ->
-        :take_from_table
-
-      {:last_take, "deck"} ->
-        :take_from_deck
-
-      {:last_take, "table"} ->
-        :take_from_table
-
-      {:hold, "held"} ->
-        :discard
-
-      {:last_hold, "held"} ->
-        :discard
-
-      {:hold, "hand"} ->
-        :swap
-    end
-  end
+  defp current_action(state, "hand") when state in [:flip_2, :flip], do: :flip
+  defp current_action(:take, "table"), do: :take_from_table
+  defp current_action(:take, "deck"), do: :take_from_deck
+  defp current_action(:hold, "held"), do: :discard
+  defp current_action(:hold, "hand"), do: :swap
 
   defp topic(id), do: "game:#{id}"
 
