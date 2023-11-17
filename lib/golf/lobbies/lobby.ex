@@ -1,12 +1,13 @@
-defmodule Golf.Games.Lobby do
+defmodule Golf.Lobbies.Lobby do
   import Ecto.Changeset
   use Golf.Schema
+  alias Golf.Users.User
 
   @primary_key {:id, Ecto.UUID, []}
 
   schema "lobbies" do
-    belongs_to :host, Golf.Users.User
-    many_to_many :users, Golf.Users.User, join_through: Golf.UserLobby
+    belongs_to :host, User
+    many_to_many :users, User, join_through: Golf.Lobbies.LobbyUser
     timestamps()
   end
 

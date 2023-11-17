@@ -1,6 +1,5 @@
 defmodule GolfWeb.HomeLive do
   use GolfWeb, :live_view
-  alias Golf.Games
 
   @impl true
   def render(assigns) do
@@ -21,8 +20,8 @@ defmodule GolfWeb.HomeLive do
 
   @impl true
   def handle_event("create-lobby", _params, %{assigns: %{user: user}} = socket) do
-    id = Games.gen_id()
-    {:ok, _} = Games.create_lobby(id, user)
+    id = Golf.gen_id()
+    {:ok, _} = Golf.Lobbies.create_lobby(id, user)
     {:noreply, push_navigate(socket, to: ~p"/lobby/#{id}")}
   end
 end

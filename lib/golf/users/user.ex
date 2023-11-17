@@ -1,18 +1,11 @@
 defmodule Golf.Users.User do
   use Golf.Schema
   import Ecto.Changeset
-
-  # @type t :: %__MODULE__{
-  #         id: integer,
-  #         name: String.t(),
-  #         lobbies: any,
-  #         inserted_at: any,
-  #         updated_at: any
-  #       }
+  alias Golf.Lobbies.{Lobby, LobbyUser}
 
   schema "users" do
     field :name, :string
-    many_to_many :lobbies, Golf.Games.Lobby, join_through: Golf.UserLobby
+    many_to_many :lobbies, Lobby, join_through: LobbyUser
     timestamps()
   end
 

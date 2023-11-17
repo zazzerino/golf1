@@ -27,4 +27,9 @@ defmodule Golf.Games.Player do
     |> cast(attrs, [:user_id, :game_id, :turn])
     |> validate_required([:user_id, :game_id, :turn])
   end
+
+  # the game id will be set when saved to the db
+  def from({user, turn}) do
+    %__MODULE__{user_id: user.id, turn: turn}
+  end
 end

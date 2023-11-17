@@ -8,12 +8,12 @@ defmodule Golf.Repo.Migrations.CreateLobbiesTable do
       timestamps()
     end
 
-    create table("users_lobbies", primary_key: false) do
+    create table("lobbies_users", primary_key: false) do
       add :user_id, references("users")
       add :lobby_id, references("lobbies", type: :uuid)
       timestamps()
     end
 
-    create unique_index("users_lobbies", [:user_id, :lobby_id])
+    create unique_index("lobbies_users", [:user_id, :lobby_id])
   end
 end

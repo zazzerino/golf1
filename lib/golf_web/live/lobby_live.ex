@@ -1,7 +1,6 @@
 defmodule GolfWeb.LobbyLive do
   use GolfWeb, :live_view
-  alias Golf.Games
-  alias Golf.Games.Opts
+  alias Golf.{Games, Lobbies}
 
   @impl true
   def render(assigns) do
@@ -21,8 +20,8 @@ defmodule GolfWeb.LobbyLive do
       <.button type="submit">Start Game</.button>
     </form>
 
-    <.button :if={@can_join?} phx-click="join-game">
-      Join Game
+    <.button :if={@can_join?} phx-click="join-lobby">
+      Join
     </.button>
 
     <p :if={@lobby && !@host?}>
@@ -49,7 +48,7 @@ defmodule GolfWeb.LobbyLive do
 
   @impl true
   def handle_info({:load_lobby, id}, %{assigns: %{user: user}} = socket) do
-    case Golf.Games.get_lobby(id) do
+    case Lobbies.get_lobby(id) do
       nil ->
         {:noreply,
          socket
@@ -92,15 +91,15 @@ defmodule GolfWeb.LobbyLive do
         %{assigns: %{lobby: lobby}} = socket
       ) do
     {num_rounds, _} = Integer.parse(num_rounds)
-    opts = %Opts{num_rounds: num_rounds}
+    opts = %Games.Opts{num_rounds: num_rounds}
     {:ok, game} = Games.create_game(lobby.id, lobby.users, opts)
     :ok = broadcast(lobby.id, :game_created)
     {:noreply, redirect(socket, to: ~p"/games/#{game.id}")}
   end
 
   @impl true
-  def handle_event("join-game", _params, %{assigns: %{lobby: lobby, user: user}} = socket) do
-    {:ok, lobby} = Games.add_lobby_user(lobby, user)
+  def handle_event("join-lobby", _params, %{assigns: %{lobby: lobby, user: user}} = socket) do
+    {:ok, lobby} = Lobbies.add_lobby_user(lobby, user)
     :ok = broadcast(lobby.id, {:user_joined, lobby, user})
     {:noreply, socket}
   end

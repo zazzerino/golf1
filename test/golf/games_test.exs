@@ -14,14 +14,14 @@ defmodule Golf.GamesTest do
       %User{name: "bob"}
       |> Users.insert_user()
 
-    id = Games.gen_id()
+    id = Golf.gen_id()
     users = [user_1, user_2]
     opts = %Opts{num_rounds: 2}
 
     {:ok, game} =
       Games.create_game(id, users, opts)
 
-    assert Games.current_state(game) == :no_rounds
+    assert Games.current_state(game) == :no_round
 
     p1 = Enum.at(game.players, 0)
     p2 = Enum.at(game.players, 1)

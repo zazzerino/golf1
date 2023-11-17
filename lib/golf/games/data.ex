@@ -17,9 +17,10 @@ defmodule Golf.Games.Data do
   ]
 
   def from(game, user_id) do
+    num_players = length(game.players)
     index = Enum.find_index(game.players, &(&1.user_id == user_id))
     player = index && Enum.at(game.players, index)
-    positions = hand_positions(length(game.players))
+    positions = hand_positions(num_players)
     round = Golf.Games.current_round(game)
     hands = if round, do: maybe_rotate(round.hands, index)
 
@@ -32,7 +33,7 @@ defmodule Golf.Games.Data do
 
     playable_cards =
       if round && player do
-        Golf.Games.playable_cards(round, player)
+        Golf.Games.playable_cards(round, player, num_players)
       else
         []
       end
@@ -85,6 +86,9 @@ defmodule Golf.Games.Data do
     Enum.map(players, &do_put_held(&1, player_id, card))
   end
 
-  defp do_put_held(%{id: id} = p, p_id, card) when id == p_id, do: %{p | heldCard: card}
+  defp do_put_held(%{id: id} = player, player_id, card) when id == player_id do
+    %{player | heldCard: card}
+  end
+
   defp do_put_held(player, _, _), do: player
 end

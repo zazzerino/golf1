@@ -99,7 +99,8 @@ export class GameContext {
         .forEach((tween, i) => {
           tween.start();
 
-          if (i === HAND_SIZE - 1) {
+          // start tweening the deck half way through the hand animation
+          if (i === HAND_SIZE / 2) {
             tween.onComplete(() => {
               this.tweenDeckDeal()
                 .start()
@@ -133,13 +134,13 @@ export class GameContext {
         return this.onSwap(event);
 
       default:
-        throw new Error("event does not have a valid action:", event);
+        throw new Error("event does not have a valid action", event);
     }
   }
 
   onFlip(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
-    if (player == null) throw new Error("player is null on flip");
+    if (!player) throw new Error("player is null on flip");
 
     const card = player.hand[event.hand_index]["name"];
     const handSprites = this.sprites.hands[player.position];
@@ -166,7 +167,7 @@ export class GameContext {
 
   onTakeFromDeck(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
-    if (player == null) throw new Error("player is null on take from deck");
+    if (!player) throw new Error("player is null on take from deck");
 
     const heldSprite = this.addHeldCard(player);
     this.tweenHeldDeck(player.position).start();
@@ -190,6 +191,8 @@ export class GameContext {
 
   onTakeFromTable(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
+    if (!player) throw new Error("player is null on take from table");
+
     const heldSprite = this.addHeldCard(player);
     this.tweenHeldTable().start();
 
@@ -206,20 +209,20 @@ export class GameContext {
 
   onDiscard(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
+    if (!player) throw new Error("player is null on discard");
+    
     this.addTableCards();
-
-    this.sprites.held.visible = false;
-    this.sprites.held = null;
+    this.tweenTableDiscard(player.position).start();
 
     const handSprites = this.sprites.hands[player.position];
-    const flipAll = this.game.state === "over";
 
     handSprites.forEach((sprite, index) => {
       if (!this.isPlayable(`hand_${index}`)) {
         makeUnplayable(sprite);
       }
 
-      if (flipAll) {
+      // if the game is over, flip all the player's cards
+      if (this.game.state === "over") {
         const cardName = player.hand[index].name;
         sprite.texture = this.textures[cardName];
       }
@@ -234,14 +237,14 @@ export class GameContext {
     const player = this.game.players.find(p => p.id === event.player_id);
     if (!player) throw new Error("player is null on swap");
 
-    const handCard = player.hand[event.hand_index].name;
     const handSprites = this.sprites.hands[player.position]
-    
     const handSprite = handSprites[event.hand_index];
-    handSprite.texture = this.textures[handCard];
 
-    this.sprites.held.visible = false;
-    this.sprites.held = null;
+    const cardName = player.hand[event.hand_index].name;
+    handSprite.texture = this.textures[cardName];
+
+    // this.sprites.held.visible = false;
+    // this.sprites.held = null;
 
     const tableCard = this.game.tableCards[0];
     const firstTexture = this.textures[tableCard];
@@ -275,6 +278,10 @@ export class GameContext {
       this.sprites.table[0] = tableSprite;
       this.stage.addChild(tableSprite);
     }
+
+    const [heldTween, tableTween] = this.tweenSwapHeld(player.position, handSprite, tableSprite);
+    heldTween.start();
+    tableTween.start();
 
     if (this.game.isFlipped) {
       handSprites.forEach((sprite, i) => {
@@ -333,46 +340,89 @@ export class GameContext {
   }
 
   tweenTableDeck() {
-    const sprite = this.sprites.table[0];
-    sprite.x = DECK_X;
+    const table = this.sprites.table[0];
+    table.x = DECK_X;
 
-    return new Tween(sprite)
+    return new Tween(table)
       .to({x: TABLE_CARD_X}, 400)
       .easing(Easing.Quadratic.Out);
   }
 
   tweenHeldDeck(position) {
-    const sprite = this.sprites.held;
-    const x = sprite.x;
-    const y = sprite.y;
+    const held = this.sprites.held;
+    const x = held.x;
+    const y = held.y;
     const rotation = posRotation(position);
 
-    sprite.x = this.sprites.deck.x;
-    sprite.y = this.sprites.deck.y + DECK_Y_OFFSET;
-    sprite.rotation = 0;
+    held.x = this.sprites.deck.x;
+    held.y = this.sprites.deck.y + DECK_Y_OFFSET;
+    held.rotation = 0;
 
-    return new Tween(sprite)
+    return new Tween(held)
       .to({x, y, rotation}, 800)
       .delay(150)
       .easing(Easing.Quadratic.InOut);
   }
 
   tweenHeldTable(position) {
-    const heldSprite = this.sprites.held;
-    const x = heldSprite.x;
-    const y = heldSprite.y;
+    const held = this.sprites.held;
+    const x = held.x;
+    const y = held.y;
     const rotation = posRotation(position);
     
-    const tableSprite = this.sprites.table.shift();
+    const table = this.sprites.table.shift();
 
-    heldSprite.x = tableSprite.x;
-    heldSprite.y = tableSprite.y;
-    heldSprite.rotation = 0;
+    held.x = table.x;
+    held.y = table.y;
+    held.rotation = 0;
 
-    return new Tween(heldSprite)
-      .onStart(() => tableSprite.visible = false)
+    return new Tween(held)
+      .onStart(() => table.visible = false)
       .to({x, y, rotation}, 800)
       .easing(Easing.Quadratic.InOut);
+  }
+
+  tweenTableDiscard(position) {
+    const table = this.sprites.table[0];
+    const held = this.sprites.held;
+    held.visible = false;
+
+    const x = table.x;
+    const y = table.y;
+
+    table.x = held.x;
+    table.y = held.y;
+    table.rotation = posRotation(position);
+
+    return new Tween(table)
+      .to({x, y, rotation: 0}, 800)
+      .easing(Easing.Quadratic.InOut);
+  }
+
+  tweenSwapHeld(position, handSprite, tableSprite) {
+    const heldSprite = this.sprites.held;
+
+    const x = handSprite.x;
+    const y = handSprite.y;
+
+    tableSprite.x = x;
+    tableSprite.y = y;
+    tableSprite.rotation = posRotation(position);
+
+    const heldTween = new Tween(heldSprite)
+      .to({x, y}, 500)
+      .easing(Easing.Quadratic.InOut)
+      .onComplete(obj => {
+        obj.visible = false;
+        handSprite.visible = true;
+      });
+
+    const tableTween = new Tween(tableSprite)
+      .to({x: TABLE_CARD_X, y: TABLE_CARD_Y, rotation: 0}, 700)
+      .easing(Easing.Quadratic.InOut)
+      .delay(200);
+
+    return [heldTween, tableTween];
   }
 
   // client events

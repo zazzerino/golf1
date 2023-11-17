@@ -3,8 +3,7 @@ defmodule Golf.Games do
 
   alias Golf.Repo
   alias Golf.Users.User
-  alias Golf.UserLobby
-  alias Golf.Games.{Game, Event, Player, Round, Opts, Lobby}
+  alias Golf.Games.{Game, Event, Player, Round, Opts}
 
   @type id :: Ecto.UUID.t()
 
@@ -15,85 +14,32 @@ defmodule Golf.Games do
   @num_decks 2
   @hand_size 6
 
-  @max_players 4
+  @events_query from(e in Event, order_by: [desc: :id])
+  @players_query from(p in Player, order_by: p.turn)
 
-  def gen_id(), do: Ecto.UUID.generate()
+  @game_preloads [:opts, rounds: [events: {@events_query, [:player]}], players: @players_query]
 
-  @doc """
-  Sorts users by the time they joined the lobby.
-  """
-  def lobby_users_query(lobby_id) do
-    from(u in User,
-      join: ul in UserLobby,
-      on: u.id == ul.user_id,
-      where: ^lobby_id == ul.lobby_id,
-      order_by: ul.inserted_at,
-      select: u
-    )
-  end
-
-  @spec get_lobby(id) :: %Lobby{} | nil
-
-  def get_lobby(id) do
-    Repo.get(Lobby, id)
-    |> Repo.preload(users: lobby_users_query(id))
-  end
-
-  @spec create_lobby(id, %User{}) :: {:ok, %Lobby{}} | {:error, any}
-
-  def create_lobby(id, host) do
-    %Lobby{id: id, host_id: host.id, users: [host]}
-    |> Lobby.changeset()
-    |> Repo.insert()
-  end
-
-  @spec add_lobby_user(%Lobby{}, %User{}) :: {:ok, %Lobby{}} | {:error, any}
-
-  def add_lobby_user(lobby, _) when length(lobby.users) >= @max_players do
-    {:error, :max_players}
-  end
-
-  def add_lobby_user(lobby, user) do
-    if Enum.any?(lobby.users, &(&1.id == user.id)) do
-      {:error, :already_joined}
-    else
-      lobby
-      |> Lobby.changeset()
-      # TODO
-      |> Ecto.Changeset.put_assoc(:users, lobby.users ++ [user])
-      |> Repo.update()
-    end
+  def get_game(id, preloads \\ @game_preloads) do
+    Repo.get(Game, id)
+    |> Repo.preload(preloads)
   end
 
   @spec fetch_game(id) :: {:ok, %Game{}} | {:error, any}
 
-  def fetch_game(id) do
-    players_query = from(p in Player, order_by: p.turn)
-    events_query = from(e in Event, order_by: [desc: :id])
-
-    Repo.get(Game, id)
-    |> Repo.preload([:opts, rounds: [events: {events_query, [:player]}], players: players_query])
-    |> case do
-      nil ->
-        {:error, :not_found}
-
-      game ->
-        num_players = length(game.players)
-        rounds = Enum.map(game.rounds, &%Round{&1 | num_players: num_players})
-        {:ok, %Game{game | rounds: rounds}}
+  def fetch_game(id, preloads \\ @game_preloads) do
+    case get_game(id, preloads) do
+      nil -> {:error, :not_found}
+      game -> {:ok, game}
     end
   end
 
-  def current_state(%Game{rounds: []}), do: :no_rounds
-  def current_state(%Game{rounds: [round | _]}), do: round.state
+  @spec new_game(id, list(%User{}), %Opts{}) :: %Game{}
 
-  @spec create_game(id, list(%User{}), %Opts{}) :: {:ok, %Game{}} | {:error, any}
-
-  def create_game(id, [host | _] = users, opts \\ %Opts{}) do
+  def new_game(id, [host | _] = users, opts \\ %Opts{}) do
     players =
       users
       |> Enum.with_index()
-      |> Enum.map(fn {user, index} -> %Player{user_id: user.id, turn: index} end)
+      |> Enum.map(&Player.from/1)
 
     %Game{
       id: id,
@@ -102,13 +48,17 @@ defmodule Golf.Games do
       players: players,
       rounds: []
     }
+  end
+
+  @spec create_game(id, list(%User{}), %Opts{}) :: {:ok, %Game{}} | {:error, any}
+
+  def create_game(id, users, opts) do
+    new_game(id, users, opts)
     |> Game.changeset()
     |> Repo.insert()
   end
 
-  @spec create_round(%Game{}) :: {:ok, %Round{}} | {:error, any}
-
-  def create_round(%Game{id: game_id, players: players}) do
+  def new_round(%Game{id: game_id, players: players}) do
     num_players = length(players)
     deck = new_deck(@num_decks) |> Enum.shuffle()
 
@@ -131,9 +81,14 @@ defmodule Golf.Games do
       deck: deck,
       hands: hands,
       table_cards: [table_card],
-      events: [],
-      num_players: num_players
+      events: []
     }
+  end
+
+  @spec create_round(%Game{}) :: {:ok, %Round{}} | {:error, any}
+
+  def create_round(game) do
+    new_round(game)
     |> Round.changeset()
     |> Repo.insert()
   end
@@ -150,20 +105,22 @@ defmodule Golf.Games do
     end
   end
 
-  @spec update_round(%Round{}, %Event{}, map) :: {:ok, %Round{}} | {:error, any}
+  defp insert_event(%Event{} = event) do
+    event
+    |> Event.changeset()
+    |> Repo.insert()
+  end
 
-  defp update_round(round, event, round_changes) do
+  defp update_round(%Round{} = round, changes) do
+    round
+    |> Round.changeset(changes)
+    |> Repo.update()
+  end
+
+  defp update_round_event(round, event, round_changes) do
     Repo.transaction(fn ->
-      {:ok, event} =
-        event
-        |> Event.changeset()
-        |> Repo.insert()
-
-      {:ok, round} =
-        round
-        |> Round.changeset(round_changes)
-        |> Repo.update()
-
+      {:ok, event} = insert_event(event)
+      {:ok, round} = update_round(round, round_changes)
       %Round{round | events: [event | round.events]}
     end)
   end
@@ -173,20 +130,24 @@ defmodule Golf.Games do
   def current_round(%Game{rounds: [round | _]}), do: round
   def current_round(_), do: nil
 
-  @spec can_act?(%Game{} | %Round{}, %Player{}) :: boolean()
+  def current_state(%Game{rounds: []}), do: :no_round
+  def current_state(%Game{rounds: [round | _]}), do: round.state
 
-  def can_act?(%Game{rounds: []}), do: false
-  def can_act?(%Game{rounds: [round | _]}, player), do: can_act?(round, player)
+  def can_act?(%Game{rounds: []}, _), do: false
 
-  def can_act?(%Round{state: :over}, _), do: false
+  def can_act?(%Game{rounds: [round | _]} = game, player) do
+    can_act?(round, player, length(game.players))
+  end
 
-  def can_act?(%Round{state: :flip_2} = round, player) do
+  def can_act?(%Round{state: :over}, _, _), do: false
+
+  def can_act?(%Round{state: :flip_2} = round, player, _) do
     hand = Enum.at(round.hands, player.turn)
     num_cards_face_up(hand) < 2
   end
 
-  def can_act?(%Round{} = round, player) do
-    rem(round.turn, round.num_players) == player.turn
+  def can_act?(round, player, num_players) do
+    rem(round.turn, num_players) == player.turn
   end
 
   @spec handle_event(%Game{}, %Event{}) :: {:ok, %Game{}} | {:error, any}
@@ -210,7 +171,7 @@ defmodule Golf.Games do
 
   def handle_round_event(round, event) do
     changes = round_changes(round, event)
-    update_round(round, event, changes)
+    update_round_event(round, event, changes)
   end
 
   @spec round_changes(%Round{}, %Event{}) :: map
@@ -329,7 +290,7 @@ defmodule Golf.Games do
         %Round{state: :hold} = round,
         %Event{action: :swap} = event
       ) do
-    {card, hand} =
+    {hand, card} =
       round.hands
       |> Enum.at(event.player.turn)
       |> maybe_flip_all(round.flipped?)
@@ -359,9 +320,9 @@ defmodule Golf.Games do
     }
   end
 
-  @spec playable_cards(%Round{}, %Player{}) :: list(binary())
+  @spec playable_cards(%Round{}, %Player{}, integer) :: list(binary())
 
-  def playable_cards(%Round{state: :flip_2} = round, player) do
+  def playable_cards(%Round{state: :flip_2} = round, player, _) do
     hand = Enum.at(round.hands, player.turn)
 
     if num_cards_face_up(hand) < 2 do
@@ -371,8 +332,8 @@ defmodule Golf.Games do
     end
   end
 
-  def playable_cards(round, player) do
-    if can_act?(round, player) do
+  def playable_cards(round, player, num_players) do
+    if can_act?(round, player, num_players) do
       hand = Enum.at(round.hands, player.turn)
       places(round.state, round.flipped?, hand)
     else
@@ -403,7 +364,7 @@ defmodule Golf.Games do
   defp swap_card(hand, index, new_card) do
     old_card = Enum.at(hand, index)["name"]
     hand = List.replace_at(hand, index, %{"name" => new_card, "face_up?" => true})
-    {old_card, hand}
+    {hand, old_card}
   end
 
   defp num_cards_face_up(hand) do
@@ -457,21 +418,3 @@ defmodule Golf.Games do
     end
   end
 end
-
-# # https://gist.github.com/danschultzer/99c21ba403fd7f49a26cc40571ff5cce
-# def gen_id() do
-#   min = String.to_integer("100000", 36)
-#   max = String.to_integer("ZZZZZZ", 36)
-
-#   max
-#   |> Kernel.-(min)
-#   |> :rand.uniform()
-#   |> Kernel.+(min)
-#   |> Integer.to_string(36)
-# end
-
-# @spec game_exists?(id) :: boolean()
-# def game_exists?(id) do
-#   from(g in Game, where: [id: ^id])
-#   |> Repo.exists?()
-# end

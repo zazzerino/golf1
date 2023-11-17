@@ -105,19 +105,18 @@ defmodule GolfWeb.GameLive do
 
     action =
       Games.current_state(game)
-      |> current_action(place)
+      |> current_action_at(place)
 
     event = Event.new(game, player, action, hand_index)
     {:ok, game} = Games.handle_event(game, event)
     :ok = broadcast(game.id, {:game_event, game, event})
   end
 
-  defp current_action(:flip_2, "hand"), do: :flip
-  defp current_action(:flip, "hand"), do: :flip
-  defp current_action(:take, "table"), do: :take_from_table
-  defp current_action(:take, "deck"), do: :take_from_deck
-  defp current_action(:hold, "held"), do: :discard
-  defp current_action(:hold, "hand"), do: :swap
+  defp current_action_at(state, "hand") when state in [:flip_2, :flip], do: :flip
+  defp current_action_at(:take, "table"), do: :take_from_table
+  defp current_action_at(:take, "deck"), do: :take_from_deck
+  defp current_action_at(:hold, "held"), do: :discard
+  defp current_action_at(:hold, "hand"), do: :swap
 
   defp topic(id), do: "game:#{id}"
 
