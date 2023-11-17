@@ -87,24 +87,6 @@ defmodule Golf.Games do
   def current_state(%Game{rounds: []}), do: :no_rounds
   def current_state(%Game{rounds: [round | _]}), do: round.state
 
-  @spec update_round(%Round{}, %Event{}, map) :: {:ok, %Round{}} | {:error, any}
-
-  defp update_round(round, event, round_changes) do
-    Repo.transaction(fn ->
-      {:ok, event} =
-        event
-        |> Event.changeset()
-        |> Repo.insert()
-
-      {:ok, round} =
-        round
-        |> Round.changeset(round_changes)
-        |> Repo.update()
-
-      %Round{round | events: [event | round.events]}
-    end)
-  end
-
   @spec create_game(id, list(%User{}), %Opts{}) :: {:ok, %Game{}} | {:error, any}
 
   def create_game(id, [host | _] = users, opts \\ %Opts{}) do
@@ -168,6 +150,24 @@ defmodule Golf.Games do
     end
   end
 
+  @spec update_round(%Round{}, %Event{}, map) :: {:ok, %Round{}} | {:error, any}
+
+  defp update_round(round, event, round_changes) do
+    Repo.transaction(fn ->
+      {:ok, event} =
+        event
+        |> Event.changeset()
+        |> Repo.insert()
+
+      {:ok, round} =
+        round
+        |> Round.changeset(round_changes)
+        |> Repo.update()
+
+      %Round{round | events: [event | round.events]}
+    end)
+  end
+
   @spec current_round(%Game{}) :: %Round{} | nil
 
   def current_round(%Game{rounds: [round | _]}), do: round
@@ -176,10 +176,7 @@ defmodule Golf.Games do
   @spec can_act?(%Game{} | %Round{}, %Player{}) :: boolean()
 
   def can_act?(%Game{rounds: []}), do: false
-
-  def can_act?(%Game{rounds: [round | _]}, player) do
-    can_act?(round, player)
-  end
+  def can_act?(%Game{rounds: [round | _]}, player), do: can_act?(round, player)
 
   def can_act?(%Round{state: :over}, _), do: false
 
@@ -211,7 +208,14 @@ defmodule Golf.Games do
 
   @spec handle_round_event(%Round{}, %Event{}) :: {:ok, %Round{}} | {:error, any}
 
-  def handle_round_event(%Round{state: :flip_2} = round, %Event{action: :flip} = event) do
+  def handle_round_event(round, event) do
+    changes = round_changes(round, event)
+    update_round(round, event, changes)
+  end
+
+  @spec round_changes(%Round{}, %Event{}) :: map
+
+  def round_changes(%Round{state: :flip_2} = round, %Event{action: :flip} = event) do
     hands =
       List.update_at(
         round.hands,
@@ -226,10 +230,10 @@ defmodule Golf.Games do
         :flip_2
       end
 
-    update_round(round, event, %{state: state, hands: hands})
+    %{state: state, hands: hands}
   end
 
-  def handle_round_event(%Round{state: :flip} = round, %Event{action: :flip} = event) do
+  def round_changes(%Round{state: :flip} = round, %Event{action: :flip} = event) do
     hand =
       round.hands
       |> Enum.at(event.player.turn)
@@ -249,30 +253,30 @@ defmodule Golf.Games do
           {:take, round.turn + 1, round.flipped?}
       end
 
-    update_round(round, event, %{state: state, turn: turn, hands: hands, flipped?: flipped?})
+    %{state: state, turn: turn, hands: hands, flipped?: flipped?}
   end
 
-  def handle_round_event(%Round{state: :take} = round, %Event{action: :take_from_deck} = event) do
+  def round_changes(%Round{state: :take} = round, %Event{action: :take_from_deck} = event) do
     {:ok, card, deck} = deal_from_deck(round.deck)
 
-    update_round(round, event, %{
+    %{
       state: :hold,
       deck: deck,
       held_card: %{"player_id" => event.player.id, "name" => card}
-    })
+    }
   end
 
-  def handle_round_event(%Round{state: :take} = round, %Event{action: :take_from_table} = event) do
+  def round_changes(%Round{state: :take} = round, %Event{action: :take_from_table} = event) do
     [card | table_cards] = round.table_cards
 
-    update_round(round, event, %{
+    %{
       state: :hold,
       table_cards: table_cards,
       held_card: %{"player_id" => event.player.id, "name" => card}
-    })
+    }
   end
 
-  def handle_round_event(
+  def round_changes(
         %Round{state: :hold, flipped?: false} = round,
         %Event{action: :discard} = event
       ) do
@@ -290,16 +294,16 @@ defmodule Golf.Games do
           {:flip, round.turn, false}
       end
 
-    update_round(round, event, %{
+    %{
       state: state,
       turn: turn,
       held_card: nil,
       table_cards: [round.held_card["name"] | round.table_cards],
       flipped?: flipped?
-    })
+    }
   end
 
-  def handle_round_event(
+  def round_changes(
         %Round{state: :hold, flipped?: true} = round,
         %Event{action: :discard} = event
       ) do
@@ -312,16 +316,16 @@ defmodule Golf.Games do
         {:take, round.turn + 1}
       end
 
-    update_round(round, event, %{
+    %{
       state: state,
       turn: turn,
       hands: hands,
       held_card: nil,
       table_cards: [round.held_card["name"] | round.table_cards]
-    })
+    }
   end
 
-  def handle_round_event(
+  def round_changes(
         %Round{state: :hold} = round,
         %Event{action: :swap} = event
       ) do
@@ -345,19 +349,19 @@ defmodule Golf.Games do
           {:take, round.turn + 1, round.flipped?}
       end
 
-    update_round(round, event, %{
+    %{
       state: state,
       turn: turn,
       held_card: nil,
       hands: hands,
       table_cards: [card | round.table_cards],
       flipped?: flipped?
-    })
+    }
   end
 
   @spec playable_cards(%Round{}, %Player{}) :: list(binary())
 
-  def playable_cards(%Round{state: :flip_2} = round, %Player{} = player) do
+  def playable_cards(%Round{state: :flip_2} = round, player) do
     hand = Enum.at(round.hands, player.turn)
 
     if num_cards_face_up(hand) < 2 do

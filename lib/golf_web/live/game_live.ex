@@ -112,7 +112,8 @@ defmodule GolfWeb.GameLive do
     :ok = broadcast(game.id, {:game_event, game, event})
   end
 
-  defp current_action(state, "hand") when state in [:flip_2, :flip], do: :flip
+  defp current_action(:flip_2, "hand"), do: :flip
+  defp current_action(:flip, "hand"), do: :flip
   defp current_action(:take, "table"), do: :take_from_table
   defp current_action(:take, "deck"), do: :take_from_deck
   defp current_action(:hold, "held"), do: :discard

@@ -1,5 +1,6 @@
 import * as PIXI from "pixi.js";
 import {OutlineFilter} from "@pixi/filter-outline";
+import {Tween, Easing, update as updateTweens} from "@tweenjs/tween.js";
 
 const GAME_WIDTH = 600;
 const GAME_HEIGHT = 600;
@@ -76,20 +77,39 @@ export class GameContext {
       });
   }
 
-  drawLoop(_time) {
+  drawLoop(time) {
     requestAnimationFrame(time => this.drawLoop(time));
+    updateTweens(time);
     this.renderer.render(this.stage);
+  }
+
+  isPlayable(place) {
+    return this.game.playableCards.includes(place);
   }
 
   // server events
 
   onRoundStart(game) {
     this.game = game;
-    this.sprites.deck.x = DECK_X;
-    this.addTableCards();
 
     for (const player of this.game.players) {
       this.addHand(player);
+
+      this.tweenHandDeal(player.position)
+        .forEach((tween, i) => {
+          tween.start();
+
+          if (i === HAND_SIZE - 1) {
+            tween.onComplete(() => {
+              this.tweenDeckDeal()
+                .start()
+                .onComplete(() => {
+                  this.addTableCards();
+                  this.tweenTableDeck().start();
+                });
+            });
+          }
+        });
     }
   }
 
@@ -121,11 +141,11 @@ export class GameContext {
     const player = this.game.players.find(p => p.id === event.player_id);
     if (player == null) throw new Error("player is null on flip");
 
-    const cardName = player.hand[event.hand_index]["name"];
+    const card = player.hand[event.hand_index]["name"];
     const handSprites = this.sprites.hands[player.position];
 
     const sprite = handSprites[event.hand_index];
-    sprite.texture = this.textures[cardName];
+    sprite.texture = this.textures[card];
 
     for (let i = 0; i < HAND_SIZE; i++) {
       if (!this.isPlayable(`hand_${i}`)) {
@@ -137,7 +157,9 @@ export class GameContext {
       makePlayable(this.sprites.deck, this.onDeckClick.bind(this));
     }
 
-    if (this.isPlayable("table")) {
+    // a player could flip a hand card before the table card is drawn
+    // so we also need to check if it exists
+    if (this.sprites.table[0] && this.isPlayable("table")) {
       makePlayable(this.sprites.table[0], this.onTableClick.bind(this));
     }
   }
@@ -147,6 +169,7 @@ export class GameContext {
     if (player == null) throw new Error("player is null on take from deck");
 
     const heldSprite = this.addHeldCard(player);
+    this.tweenHeldDeck(player.position).start();
     
     const isUsersEvent = player.id === this.game.playerId;
     if (isUsersEvent) {
@@ -168,12 +191,9 @@ export class GameContext {
   onTakeFromTable(event) {
     const player = this.game.players.find(p => p.id === event.player_id);
     const heldSprite = this.addHeldCard(player);
-
-    const tableSprite = this.sprites.table.shift();
-    tableSprite.visible = false;
+    this.tweenHeldTable().start();
 
     if (player.id === this.game.playerId) {
-      makeUnplayable(tableSprite);
       makeUnplayable(this.sprites.deck);
       makePlayable(heldSprite, this.onHeldClick.bind(this));
 
@@ -278,6 +298,82 @@ export class GameContext {
       makePlayable(tableSprite, this.onTableClick.bind(this));
     }
   }
+  
+  // tweens
+
+  tweenHandDeal(position) {
+    const tweens = [];
+    const sprites = this.sprites.hands[position];
+
+    for (let i = sprites.length - 1; i >= 0; i--) {
+      const sprite = sprites[i];
+      const x = sprite.x;
+      const y = sprite.y;
+      const rotation = posRotation(position);
+
+      sprite.x = CENTER_X;
+      sprite.y = DECK_Y + DECK_Y_OFFSET;
+      sprite.rotation = 0;
+
+      const tween = new Tween(sprite)
+        .to({x, y, rotation})
+        .easing(Easing.Cubic.InOut)
+        .delay((HAND_SIZE - 1 - i) * 180);
+
+      tweens.push(tween);
+    }
+
+    return tweens;
+  }
+
+  tweenDeckDeal() {
+    return new Tween(this.sprites.deck)
+      .to({x: DECK_X}, 200)
+      .easing(Easing.Quadratic.Out);
+  }
+
+  tweenTableDeck() {
+    const sprite = this.sprites.table[0];
+    sprite.x = DECK_X;
+
+    return new Tween(sprite)
+      .to({x: TABLE_CARD_X}, 400)
+      .easing(Easing.Quadratic.Out);
+  }
+
+  tweenHeldDeck(position) {
+    const sprite = this.sprites.held;
+    const x = sprite.x;
+    const y = sprite.y;
+    const rotation = posRotation(position);
+
+    sprite.x = this.sprites.deck.x;
+    sprite.y = this.sprites.deck.y + DECK_Y_OFFSET;
+    sprite.rotation = 0;
+
+    return new Tween(sprite)
+      .to({x, y, rotation}, 800)
+      .delay(150)
+      .easing(Easing.Quadratic.InOut);
+  }
+
+  tweenHeldTable(position) {
+    const heldSprite = this.sprites.held;
+    const x = heldSprite.x;
+    const y = heldSprite.y;
+    const rotation = posRotation(position);
+    
+    const tableSprite = this.sprites.table.shift();
+
+    heldSprite.x = tableSprite.x;
+    heldSprite.y = tableSprite.y;
+    heldSprite.rotation = 0;
+
+    return new Tween(heldSprite)
+      .onStart(() => tableSprite.visible = false)
+      .to({x, y, rotation}, 800)
+      .easing(Easing.Quadratic.InOut);
+  }
 
   // client events
 
@@ -359,6 +455,7 @@ export class GameContext {
     for (let i = 0; i < HAND_SIZE; i++) {
       const card = player.hand[i];
       const name = card["face_up?"] ? card.name : DOWN_CARD;
+
       const texture = this.textures[name];
       const coord = handCardCoord(player.position, i);
       const sprite = makeCardSprite(texture, coord.x, coord.y);
@@ -386,10 +483,6 @@ export class GameContext {
     }
 
     return sprite;
-  }
-
-  isPlayable(place) {
-    return this.game.playableCards.includes(place);
   }
 }
 
@@ -428,7 +521,7 @@ function deckX(state) {
   return state ? DECK_X : CENTER_X;
 }
 
-function playerRotation(position) {
+function posRotation(position) {
   return position == "left" || position === "right"
     ? toRadians(90)
     : 0;
@@ -461,7 +554,7 @@ function heldCardCoord(
       break;
   }
 
-  const rotation = playerRotation(position);
+  const rotation = posRotation(position);
   return { x, y, rotation }
 }
 
@@ -600,7 +693,7 @@ function handCardCoord(
     }
   }
 
-  const rotation = playerRotation(position);
+  const rotation = posRotation(position);
   return { x, y, rotation };
 }
 
