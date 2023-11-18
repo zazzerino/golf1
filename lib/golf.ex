@@ -8,6 +8,14 @@ defmodule Golf do
   """
   def gen_id(), do: Ecto.UUID.generate()
 
+  def maybe_rotate(list, n) when n in [0, nil], do: list
+  def maybe_rotate(list, n), do: rotate(list, n)
+
+  def rotate(list, n) do
+    {left, right} = Enum.split(list, n)
+    right ++ left
+  end
+
   # # https://gist.github.com/danschultzer/99c21ba403fd7f49a26cc40571ff5cce
   # def gen_id() do
   #   min = String.to_integer("100000", 36)

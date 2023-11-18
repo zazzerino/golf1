@@ -20,9 +20,6 @@ defmodule GolfWeb.Router do
       live "/lobby/:id", LobbyLive
       live "/games/:id", GameLive
     end
-
-    get "/lobby/join/:id", GameController, :join
-    post "/lobby/join", GameController, :join
   end
 
   # pipeline :api do

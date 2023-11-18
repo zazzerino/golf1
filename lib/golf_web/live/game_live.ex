@@ -9,10 +9,23 @@ defmodule GolfWeb.GameLive do
     ~H"""
     <h2>Game</h2>
     <h3><%= String.upcase(@game_id) %></h3>
-    <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
+
+    <div id="game-wrapper">
+      <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
+      <.player_score :for={p <- @players} player={p} />
+    </div>
+
     <.button :if={@can_start?} class="mt-2" phx-click="start-round">
       Start Round
     </.button>
+    """
+  end
+
+  defp player_score(assigns) do
+    ~H"""
+    <div class={"player-score #{@player.position}"}>
+      id=<%= @player.id %>(score=<%= @player.score %>)
+    </div>
     """
   end
 
@@ -27,6 +40,7 @@ defmodule GolfWeb.GameLive do
        page_title: "Game",
        game_id: id,
        game: nil,
+       players: [],
        player: nil,
        can_start?: nil
      )}
@@ -36,18 +50,21 @@ defmodule GolfWeb.GameLive do
   def handle_info({:load_game, id}, %{assigns: %{user: user}} = socket) do
     case Games.fetch_game(id) do
       {:ok, game} ->
-        host? = user.id == game.host_id
-        can_start? = host? && !Games.current_round(game)
-        :ok = Phoenix.PubSub.subscribe(Golf.PubSub, topic(id))
+        can_start? = user.id == game.host_id && !Games.current_round(game)
+        data = Games.Data.from(game, user.id)
+
+        :ok = subscribe(id)
 
         {:noreply,
          socket
-         |> assign(game: game, can_start?: can_start?)
-         |> push_event("game-loaded", %{"game" => Games.Data.from(game, user.id)})}
+         |> assign(game: game, players: data.players, can_start?: can_start?)
+         |> push_event("game-loaded", %{"game" => data})}
 
       _ ->
         {:noreply,
-         socket |> push_navigate(to: ~p"/") |> put_flash(:error, "Game #{id} not found.")}
+         socket
+         |> push_navigate(to: ~p"/")
+         |> put_flash(:error, "Game #{id} not found.")}
     end
   end
 
@@ -61,10 +78,13 @@ defmodule GolfWeb.GameLive do
 
   @impl true
   def handle_info({:game_event, game, event}, %{assigns: %{user: user}} = socket) do
+    data = Games.Data.from(game, user.id)
+
     {:noreply,
      socket
      |> assign(game: game)
-     |> push_event("game-event", %{"game" => Games.Data.from(game, user.id), "event" => event})}
+     |> assign(players: data.players)
+     |> push_event("game-event", %{"game" => data, "event" => event})}
   end
 
   @impl true
@@ -107,22 +127,26 @@ defmodule GolfWeb.GameLive do
 
     action =
       Games.current_state(game)
-      |> current_action_at(place)
+      |> action_at(place)
 
     event = Event.new(game, player, action, hand_index)
     {:ok, game} = Games.handle_event(game, event)
     :ok = broadcast(game.id, {:game_event, game, event})
   end
 
-  defp current_action_at(state, "hand") when state in [:flip_2, :flip], do: :flip
-  defp current_action_at(:take, "table"), do: :take_from_table
-  defp current_action_at(:take, "deck"), do: :take_from_deck
-  defp current_action_at(:hold, "held"), do: :discard
-  defp current_action_at(:hold, "hand"), do: :swap
+  defp action_at(state, "hand") when state in [:flip_2, :flip], do: :flip
+  defp action_at(:take, "table"), do: :take_from_table
+  defp action_at(:take, "deck"), do: :take_from_deck
+  defp action_at(:hold, "held"), do: :discard
+  defp action_at(:hold, "hand"), do: :swap
 
   defp topic(id), do: "game:#{id}"
 
-  defp broadcast(game_id, msg) do
-    Phoenix.PubSub.broadcast(Golf.PubSub, topic(game_id), msg)
+  def subscribe(id) do
+    Phoenix.PubSub.subscribe(Golf.PubSub, topic(id))
+  end
+
+  defp broadcast(id, msg) do
+    Phoenix.PubSub.broadcast(Golf.PubSub, topic(id), msg)
   end
 end

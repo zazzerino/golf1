@@ -3,9 +3,9 @@ import { update as updateTweens } from "@tweenjs/tween.js";
 
 import {
   GAME_WIDTH, GAME_HEIGHT, DECK_X, TABLE_CARD_X, TABLE_CARD_Y, handCardCoord, heldCardCoord
-} from "./canvas";
+} from "./game_canvas";
 
-import { 
+import {
   makeCardSprite, makeDeckSprite, makePlayable, makeTableSprite, makeUnplayable
 } from "./sprites";
 
@@ -91,7 +91,7 @@ export class GameContext {
   addTableCards() {
     const card0 = this.game.tableCards[0];
     const card1 = this.game.tableCards[1];
-    
+
     // add the second card first, so it's on bottom
     if (card1) {
       const texture1 = this.textures[card1];
@@ -123,8 +123,8 @@ export class GameContext {
       this.sprites.hands[player.position][i] = sprite;
       this.stage.addChild(sprite);
 
-      const isPlayersCard = player.id === this.game.playerId;
-      if (isPlayersCard && this.isPlayable(`hand_${i}`)) {
+      if (player.id === this.game.playerId
+        && this.isPlayable(`hand_${i}`)) {
         makePlayable(sprite, () => this.onHandClick(player.id, i));
       }
     }
@@ -156,22 +156,22 @@ export class GameContext {
     for (const player of this.game.players) {
       this.addHand(player);
 
-    //   tweenHand(player.position, this.sprites.hands[player.position])
-    //     .forEach((tween, i) => {
-    //       tween.start();
+      //   tweenHand(player.position, this.sprites.hands[player.position])
+      //     .forEach((tween, i) => {
+      //       tween.start();
 
-    //       // start tweening the deck half way through the hand tweens
-    //       if (i === HAND_SIZE / 2) {
-    //         tween.onComplete(() => {
-    //           tweenDeck(this.sprites.deck)
-    //             .start()
-    //             .onComplete(() => {
-    //               this.addTableCards();
-    //               tweenTableDeck(this.sprites.table[0]).start();
-    //             });
-    //         });
-    //       }
-    //     });
+      //       // start tweening the deck half way through the hand tweens
+      //       if (i === HAND_SIZE / 2) {
+      //         tween.onComplete(() => {
+      //           tweenDeck(this.sprites.deck)
+      //             .start()
+      //             .onComplete(() => {
+      //               this.addTableCards();
+      //               tweenTableDeck(this.sprites.table[0]).start();
+      //             });
+      //         });
+      //       }
+      //     });
     }
   }
 
@@ -303,7 +303,7 @@ export class GameContext {
 
     handSprite.texture = this.textures[cardName];
     handSprite.visible = true;
-    
+
     this.sprites.held.visible = false;
 
     const card0 = this.game.tableCards[0];

@@ -3,37 +3,42 @@ defmodule Golf.Games.Data do
   The game data that will be sent to the client.
   """
 
+  alias Golf.Games
+
   @derive Jason.Encoder
   defstruct [
     :id,
     :state,
-    :isFlipped,
     :turn,
     :deck,
     :tableCards,
+    :isFlipped,
     :players,
     :playerId,
     :playableCards
   ]
 
   def from(game, user_id) do
-    num_players = length(game.players)
     index = Enum.find_index(game.players, &(&1.user_id == user_id))
     player = index && Enum.at(game.players, index)
+
+    num_players = length(game.players)
     positions = hand_positions(num_players)
-    round = Golf.Games.current_round(game)
-    hands = if round, do: maybe_rotate(round.hands, index)
+
+    round = Games.current_round(game)
+    hands = if round, do: Golf.maybe_rotate(round.hands, index)
 
     players =
       game.players
-      |> maybe_rotate(index)
-      |> put_positions(positions)
+      |> Golf.maybe_rotate(index)
+      |> Games.put_positions(positions)
       |> put_hands(hands)
       |> put_held_card(round && round.held_card)
+      |> Games.put_scores(hands)
 
     playable_cards =
       if round && player do
-        Golf.Games.playable_cards(round, player, num_players)
+        Games.playable_cards(round, player, num_players)
       else
         []
       end
@@ -60,24 +65,10 @@ defmodule Golf.Games.Data do
     end
   end
 
-  defp maybe_rotate(list, n) when n in [0, nil], do: list
-
-  defp maybe_rotate(list, n) do
-    list
-    |> Stream.cycle()
-    |> Stream.drop(n)
-    |> Stream.take(length(list))
-    |> Enum.to_list()
-  end
-
   defp put_hands(players, nil), do: players
 
   defp put_hands(players, hands) do
     Enum.zip_with(players, hands, fn p, hand -> %{p | hand: hand} end)
-  end
-
-  defp put_positions(players, positions) do
-    Enum.zip_with(players, positions, fn p, pos -> %{p | position: pos} end)
   end
 
   defp put_held_card(players, nil), do: players

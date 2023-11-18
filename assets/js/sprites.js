@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 import { OutlineFilter } from "@pixi/filter-outline";
-import { CARD_SCALE, DECK_Y, TABLE_CARD_X, TABLE_CARD_Y, deckX } from "./canvas";
+import { CARD_SCALE, DECK_Y, TABLE_CARD_X, TABLE_CARD_Y, deckX } from "./game_canvas";
 
 const PLAYABLE_FILTER = new OutlineFilter(2, 0xff00ff, 1.0);
 

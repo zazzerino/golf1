@@ -2,10 +2,41 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-/* This file is for your main application CSS */
-
-#game-canvas {
+#game-wrapper {
   width: 600px;
   height: 600px;
+  position: relative;
   background-color: forestgreen;
+}
+
+.player-score {
+  position: absolute;
+  /* font-size: 65%; */
+  color:gold;
+}
+
+.player-score.bottom {
+  top: 98%;
+  left: 30%;
+  transform: translateX(-100%) translateY(-100%);
+}
+
+.player-score.top {
+  top: 2%;
+  left: 70%;
+  transform: translateY(-25%);
+}
+
+.player-score.left {
+  top: 10%;
+  left: 2%;
+  transform-origin: 0 100%;
+  transform: translateY(-100%) rotate(90deg);
+}
+
+.player-score.right {
+  top: 90%;
+  left: 98%;
+  transform-origin: 0 100%;
+  transform: translateY(-100%) rotate(-90deg);
 }

@@ -8,7 +8,7 @@ defmodule Golf.Games.Player do
           turn: integer
         }
 
-  @derive {Jason.Encoder, only: [:id, :turn, :position, :heldCard, :hand]}
+  @derive {Jason.Encoder, only: [:id, :turn, :position, :heldCard, :hand, :score]}
   schema "players" do
     belongs_to :game, Golf.Games.Game, type: :binary_id
     belongs_to :user, Golf.Users.User
@@ -19,6 +19,7 @@ defmodule Golf.Games.Player do
     field :position, :string, virtual: true
     field :heldCard, :string, virtual: true
     field :hand, {:array, :map}, virtual: true
+    field :score, :integer, virtual: true
   end
 
   @spec changeset(t, map) :: Ecto.Changeset.t()
@@ -26,10 +27,5 @@ defmodule Golf.Games.Player do
     player
     |> cast(attrs, [:user_id, :game_id, :turn])
     |> validate_required([:user_id, :game_id, :turn])
-  end
-
-  # the game id will be set when saved to the db
-  def from({user, turn}) do
-    %__MODULE__{user_id: user.id, turn: turn}
   end
 end

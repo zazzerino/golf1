@@ -32,13 +32,18 @@ defmodule Golf.Games do
     end
   end
 
+  # the game id will be set when saved to the db
+  defp player_from({user, turn}) do
+    %Player{user_id: user.id, turn: turn}
+  end
+
   @spec new_game(id, list(%User{}), %Opts{}) :: %Game{}
 
   def new_game(id, [host | _] = users, opts \\ %Opts{}) do
     players =
       users
       |> Enum.with_index()
-      |> Enum.map(&Player.from/1)
+      |> Enum.map(&player_from/1)
 
     %Game{
       id: id,
@@ -346,6 +351,110 @@ defmodule Golf.Games do
   defp places(:take, false, _), do: [:deck, :table]
   defp places(:flip, _, hand), do: face_down_cards(hand)
   defp places(:hold, _, _), do: [:held, :hand_0, :hand_1, :hand_2, :hand_3, :hand_4, :hand_5]
+
+  def put_positions(players, positions) do
+    Enum.zip_with(players, positions, fn p, pos -> %{p | position: pos} end)
+  end
+
+  # if there aren't any hands, give each player a score of 0
+  def put_scores(players, nil) do
+    Enum.map(players, &%{&1 | score: 0})
+  end
+
+  def put_scores(players, hands) do
+    Enum.zip_with(players, hands, &%{&1 | score: score(&2)})
+  end
+
+  def score(hand) do
+    hand
+    |> Enum.map(&rank_or_nil/1)
+    |> score_ranks(0)
+  end
+
+  defp rank_value(rank) when is_integer(rank) do
+    case rank do
+      ?K -> 0
+      ?A -> 1
+      ?2 -> 2
+      ?3 -> 3
+      ?4 -> 4
+      ?5 -> 5
+      ?6 -> 6
+      ?7 -> 7
+      ?8 -> 8
+      ?9 -> 9
+      r when r in [?T, ?J, ?Q] -> 10
+    end
+  end
+
+  defp rank_value(<<rank, _>>), do: rank_value(rank)
+
+  defp rank_or_nil(%{"face_up?" => true, "name" => <<rank, _>>}), do: rank
+  defp rank_or_nil(_), do: nil
+
+  # Each hand consists of two rows of three cards.
+  # If the cards in a column match they are worth 0 points so we discard them and recurse with the remaining cards.
+  # The remaining cards don't match so we total their individual values.
+  defp score_ranks(ranks, total) do
+    case ranks do
+      # all match
+      [a, a, a,
+       a, a, a] when is_integer(a) ->
+        -40
+
+      # outer cols match
+      [a, b, a,
+       a, c, a] when is_integer(a) ->
+        score_ranks([b, c], total - 20)
+
+      # left 2 cols match
+      [a, a, b,
+       a, a, c] when is_integer(a) ->
+        score_ranks([b, c], total - 10)
+
+      # right 2 cols match
+      [a, b, b,
+       c, b, b] when is_integer(b) ->
+        score_ranks([a, c], total - 10)
+
+      # left col match
+      [a, b, c,
+       a, d, e] when is_integer(a) ->
+        score_ranks([b, c, d, e], total)
+
+      # middle col match
+      [a, b, c,
+       d, b, e] when is_integer(b) ->
+        score_ranks([a, c, d, e], total)
+
+      # right col match
+      [a, b, c,
+       d, e, c] when is_integer(c) ->
+        score_ranks([a, b, d, e], total)
+
+      # left col match, pass 2
+      [a, b,
+       a, c] when is_integer(a) ->
+        score_ranks([b, c], total)
+
+      # right col match, pass 2
+      [a, b,
+       c, b] when is_integer(b) ->
+        score_ranks([a, c], total)
+
+      # match, pass 3
+      [a,
+       a] when is_integer(a) ->
+        total
+
+      # no matches, add the val of each card rank
+      _ ->
+        ranks
+        |> Enum.reject(&is_nil/1)
+        |> Enum.reduce(0, fn name, acc -> rank_value(name) + acc end)
+        |> Kernel.+(total)
+    end
+  end
 
   defp flip_card(card) do
     %{card | "face_up?" => true}

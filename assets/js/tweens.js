@@ -1,8 +1,8 @@
 import { Easing, Tween } from "@tweenjs/tween.js";
 
 import { 
-  CENTER_X, DECK_X, DECK_Y, DECK_Y_OFFSET, TABLE_CARD_X, TABLE_CARD_Y, HAND_SIZE, rotationAt 
-} from "./canvas";
+  rotationAt, CENTER_X, DECK_X, DECK_Y, DECK_Y_OFFSET, TABLE_CARD_X, TABLE_CARD_Y, HAND_SIZE 
+} from "./game_canvas";
 
 export function tweenHand(pos, handSprites) {
   const tweens = [];
