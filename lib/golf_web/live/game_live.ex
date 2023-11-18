@@ -1,5 +1,6 @@
 defmodule GolfWeb.GameLive do
   use GolfWeb, :live_view
+
   alias Golf.Games
   alias Golf.Games.{Event, Player}
 
@@ -45,7 +46,8 @@ defmodule GolfWeb.GameLive do
          |> push_event("game-loaded", %{"game" => Games.Data.from(game, user.id)})}
 
       _ ->
-        {:noreply, socket |> redirect(to: ~p"/") |> put_flash(:error, "Game #{id} not found.")}
+        {:noreply,
+         socket |> push_navigate(to: ~p"/") |> put_flash(:error, "Game #{id} not found.")}
     end
   end
 

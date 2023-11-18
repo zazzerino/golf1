@@ -13,4 +13,9 @@ The goal of the game is to get the lowest score possible.
 At the start of a round, each player flips two cards.
 After everyone has flipped, the host user goes first.
 Once a player has flipped all their cards, every other player has one remaining turn.
-After this turn, all their cards will be flipped over.
+After this turn, all every player's cards will be flipped over.
+
+## Thanks
+
+Card images from
+https://screamingbrainstudios.itch.io/poker-pack

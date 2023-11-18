@@ -16,7 +16,6 @@ defmodule Golf.Games do
 
   @events_query from(e in Event, order_by: [desc: :id])
   @players_query from(p in Player, order_by: p.turn)
-
   @game_preloads [:opts, rounds: [events: {@events_query, [:player]}], players: @players_query]
 
   def get_game(id, preloads \\ @game_preloads) do
@@ -60,9 +59,11 @@ defmodule Golf.Games do
 
   def new_round(%Game{id: game_id, players: players}) do
     num_players = length(players)
-    deck = new_deck(@num_decks) |> Enum.shuffle()
 
-    # deal hands
+    deck =
+      new_deck(@num_decks)
+      |> Enum.shuffle()
+
     num_hand_cards = @hand_size * num_players
     {:ok, hand_cards, deck} = deal_from_deck(deck, num_hand_cards)
 
@@ -71,7 +72,6 @@ defmodule Golf.Games do
       |> Enum.map(&%{"name" => &1, "face_up?" => false})
       |> Enum.chunk_every(@hand_size)
 
-    # deal table card
     {:ok, table_card, deck} = deal_from_deck(deck)
 
     %Round{
@@ -341,6 +341,7 @@ defmodule Golf.Games do
     end
   end
 
+  # TODO find a better name
   defp places(:take, true, hand), do: [:deck, :table] ++ face_down_cards(hand)
   defp places(:take, false, _), do: [:deck, :table]
   defp places(:flip, _, hand), do: face_down_cards(hand)

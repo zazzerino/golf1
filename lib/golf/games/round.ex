@@ -6,6 +6,7 @@ defmodule Golf.Games.Round do
 
   schema "rounds" do
     belongs_to :game, Golf.Games.Game, type: :binary_id
+    has_many :events, Golf.Games.Event
 
     field :state, Ecto.Enum, values: @states
     field :turn, :integer
@@ -15,9 +16,6 @@ defmodule Golf.Games.Round do
     field :held_card, :map
     field :flipped?, :boolean, default: false
 
-    has_many :events, Golf.Games.Event
-
-    field :num_players, :integer, virtual: true
     timestamps()
   end
 

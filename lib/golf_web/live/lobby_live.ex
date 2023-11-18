@@ -1,6 +1,7 @@
 defmodule GolfWeb.LobbyLive do
   use GolfWeb, :live_view
   alias Golf.{Games, Lobbies}
+  alias Golf.Games.Opts
 
   @impl true
   def render(assigns) do
@@ -56,7 +57,7 @@ defmodule GolfWeb.LobbyLive do
          |> put_flash(:error, "Lobby #{id} not found.")}
 
       lobby ->
-        :ok = Phoenix.PubSub.subscribe(Golf.PubSub, topic(id))
+        :ok = subscribe(id)
 
         {:noreply,
          assign(socket,
@@ -81,7 +82,7 @@ defmodule GolfWeb.LobbyLive do
 
   @impl true
   def handle_info(:game_created, %{assigns: %{lobby_id: id}} = socket) do
-    {:noreply, redirect(socket, to: ~p"/games/#{id}")}
+    {:noreply, push_navigate(socket, to: ~p"/games/#{id}")}
   end
 
   @impl true
@@ -91,10 +92,10 @@ defmodule GolfWeb.LobbyLive do
         %{assigns: %{lobby: lobby}} = socket
       ) do
     {num_rounds, _} = Integer.parse(num_rounds)
-    opts = %Games.Opts{num_rounds: num_rounds}
+    opts = %Opts{num_rounds: num_rounds}
     {:ok, game} = Games.create_game(lobby.id, lobby.users, opts)
     :ok = broadcast(lobby.id, :game_created)
-    {:noreply, redirect(socket, to: ~p"/games/#{game.id}")}
+    {:noreply, push_navigate(socket, to: ~p"/games/#{game.id}")}
   end
 
   @impl true
@@ -105,6 +106,10 @@ defmodule GolfWeb.LobbyLive do
   end
 
   defp topic(id), do: "lobby:#{id}"
+
+  defp subscribe(id) do
+    Phoenix.PubSub.subscribe(Golf.PubSub, topic(id))
+  end
 
   defp broadcast(id, msg) do
     Phoenix.PubSub.broadcast(Golf.PubSub, topic(id), msg)
