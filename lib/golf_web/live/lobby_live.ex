@@ -18,18 +18,26 @@ defmodule GolfWeb.LobbyLive do
       </p>
     </div>
 
-    <form :if={@host?} class="mt-4" phx-submit="start-game">
-      <.input name="num-rounds" type="number" min="1" value="1" label="Number of rounds" />
-      <.button type="submit">Start Game</.button>
-    </form>
+    <.opts_form :if={@host?} />
 
-    <.button :if={@can_join?} phx-click="join-lobby">
+    <.button :if={@can_join?} phx-click="join-lobby" class="my-2">
       Join
     </.button>
 
-    <p :if={@lobby && !@host?}>
+    <p class="mt-4" :if={@lobby && !@host?}>
       Waiting for host to start game...
     </p>
+    """
+  end
+
+  def opts_form(assigns) do
+    ~H"""
+    <.simple_form for={%{}} phx-submit="start-game">
+      <.input name="num-rounds" type="number" min="1" value="1" label="Number of rounds" />
+      <:actions>
+        <.button>Start Game</.button>
+      </:actions>
+    </.simple_form>
     """
   end
 
@@ -72,9 +80,11 @@ defmodule GolfWeb.LobbyLive do
 
   @impl true
   def handle_info(
-        {:user_joined, lobby, _new_user},
-        %{assigns: %{user: user}} = socket
+        {:user_joined, new_user},
+        %{assigns: %{user: user, lobby: lobby}} = socket
       ) do
+    lobby = %{lobby | users: lobby.users ++ [new_user]}
+
     {:noreply,
      assign(socket,
        lobby: lobby,
@@ -90,7 +100,7 @@ defmodule GolfWeb.LobbyLive do
   @impl true
   def handle_event("join-lobby", _params, %{assigns: %{lobby: lobby, user: user}} = socket) do
     {:ok, lobby} = Lobbies.add_lobby_user(lobby, user)
-    :ok = Golf.broadcast(topic(lobby.id), {:user_joined, lobby, user})
+    :ok = Golf.broadcast(topic(lobby.id), {:user_joined, user})
     {:noreply, socket}
   end
 
@@ -102,7 +112,7 @@ defmodule GolfWeb.LobbyLive do
       ) do
     {num_rounds, _} = Integer.parse(num_rounds)
     opts = %Opts{num_rounds: num_rounds}
-    {:ok, _game} = Golf.Links.create_game_link(link_id, lobby.users, opts)
+    {:ok, _} = Golf.Links.create_link_game(link_id, lobby.users, opts)
     :ok = Golf.broadcast_from(topic(lobby.id), :game_created)
     {:noreply, push_navigate(socket, to: ~p"/game/#{link_id}")}
   end

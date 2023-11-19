@@ -4,8 +4,6 @@ defmodule Golf.Games do
   alias Golf.Repo
   alias Golf.Games.{Game, Event, Player, Round, Opts}
 
-  @type id :: Ecto.UUID.t()
-
   @card_names for rank <- ~w(A 2 3 4 5 6 7 8 9 T J Q K),
                   suit <- ~w(C D H S),
                   do: rank <> suit
@@ -15,30 +13,24 @@ defmodule Golf.Games do
 
   @events_query from(e in Event, order_by: [desc: :id])
   @players_query from(p in Player, order_by: p.turn)
-  @game_preloads [:opts, rounds: [events: {@events_query, [:player]}], players: {@players_query, [:user]}]
+  @player_turn_query from(p in Player, select: %{turn: p.turn})
+
+  @game_preloads [
+    :opts,
+    players: {@players_query, [:user]},
+    rounds: [events: {@events_query, [player: @player_turn_query]}]
+  ]
 
   def get_game(id, preloads \\ @game_preloads) do
     Repo.get(Game, id)
     |> Repo.preload(preloads)
   end
 
-  def fetch_game(id, preloads \\ @game_preloads) do
-    case get_game(id, preloads) do
-      nil -> {:error, :not_found}
-      game -> {:ok, game}
-    end
-  end
-
-  # the game id will be set when saved to the db
-  defp player_from({user, turn}) do
-    %Player{user_id: user.id, turn: turn}
-  end
-
   def new_game([host | _] = users, opts \\ %Opts{}) do
     players =
       users
       |> Enum.with_index()
-      |> Enum.map(&player_from/1)
+      |> Enum.map(fn {user, i} -> %Player{user_id: user.id, turn: i} end)
 
     %Game{
       host_id: host.id,
@@ -130,17 +122,17 @@ defmodule Golf.Games do
   def can_act?(%Game{rounds: []}, _), do: false
 
   def can_act?(%Game{rounds: [round | _]} = game, player) do
-    can_act?(round, player, length(game.players))
+    can_act_round?(round, player, length(game.players))
   end
 
-  def can_act?(%Round{state: :over}, _, _), do: false
+  def can_act_round?(%Round{state: :over}, _, _), do: false
 
-  def can_act?(%Round{state: :flip_2} = round, player, _) do
+  def can_act_round?(%Round{state: :flip_2} = round, player, _) do
     hand = Enum.at(round.hands, player.turn)
     num_cards_face_up(hand) < 2
   end
 
-  def can_act?(round, player, num_players) do
+  def can_act_round?(round, player, num_players) do
     rem(round.turn, num_players) == player.turn
   end
 
@@ -327,7 +319,7 @@ defmodule Golf.Games do
   end
 
   def playable_cards(round, player, num_players) do
-    if can_act?(round, player, num_players) do
+    if can_act_round?(round, player, num_players) do
       hand = Enum.at(round.hands, player.turn)
       places(round.state, round.flipped?, hand)
     else
@@ -356,7 +348,7 @@ defmodule Golf.Games do
 
   def score(hand) do
     hand
-    |> Enum.map(&rank_or_nil/1)
+    |> Enum.map(&rank_if_face_up/1)
     |> score_ranks(0)
   end
 
@@ -378,13 +370,17 @@ defmodule Golf.Games do
 
   defp rank_value(<<rank, _>>), do: rank_value(rank)
 
-  defp rank_or_nil(%{"face_up?" => true, "name" => <<rank, _>>}), do: rank
-  defp rank_or_nil(_), do: nil
+  defp rank_if_face_up(%{"face_up?" => true, "name" => <<rank, _>>}), do: rank
+  defp rank_if_face_up(_), do: nil
 
   # Each hand consists of two rows of three cards.
-  # If the cards in a column match they are worth 0 points so we discard them and recurse with the remaining cards.
-  # The remaining cards don't match so we total their individual values.
-  # Face down cards are represented by nil and will be ignored.
+  # Face down cards are represented by nil and ignored.
+  # If the cards are face up and in a matching column, they are worth 0 points and are discarded.
+  # Special cases:
+  #   6 of a kind -> -40 pts
+  #   4 of a kind (outer cols) -> -20 pts
+  #   4 of a kind (adj cols) -> -10 pts
+  # The rank value of each remaining face up card is totaled together.
   defp score_ranks(ranks, total) do
     case ranks do
       # all match, -40 points

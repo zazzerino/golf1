@@ -60,7 +60,7 @@ defmodule Golf.Links do
     }
   end
 
-  def create_lobby_link(user) do
+  def create_link_lobby(user) do
     Repo.transaction(fn ->
       {:ok, lobby} = Golf.Lobbies.create_lobby(user)
 
@@ -69,18 +69,18 @@ defmodule Golf.Links do
         |> Link.changeset()
         |> Repo.insert()
 
-      link
+      {link.id, lobby}
     end)
   end
 
-  def create_game_link(link_id, users, opts) do
+  def create_link_game(link_id, users, opts) when is_binary(link_id) do
     Repo.transaction(fn ->
       {:ok, game} = Golf.Games.create_game(users, opts)
 
-      # should update 1, return nothing
+      # update 1, return nothing
       {1, nil} =
         from(l in Link, where: [id: ^link_id])
-        |> Repo.update_all(set: [game_id: game.id])
+        |> Repo.update_all([set: [game_id: game.id]])
 
       game
     end)
