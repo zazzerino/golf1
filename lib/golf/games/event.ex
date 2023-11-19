@@ -3,8 +3,7 @@ defmodule Golf.Games.Event do
   import Ecto.Changeset
   alias Golf.Games.{Game, Round}
 
-  @type action :: :take_from_deck | :take_from_table | :swap | :discard | :flip
-
+  # @type action :: :take_from_deck | :take_from_table | :swap | :discard | :flip
   @actions [:take_from_deck, :take_from_table, :swap, :discard, :flip]
 
   @derive {Jason.Encoder, only: [:round_id, :player_id, :action, :hand_index]}

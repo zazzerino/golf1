@@ -1,5 +1,6 @@
 defmodule Golf.Users do
   import Ecto.Query
+
   alias Golf.Repo
   alias Golf.Users.User
 
@@ -16,5 +17,11 @@ defmodule Golf.Users do
 
   def insert_user(user \\ %User{name: @default_name}) do
     Repo.insert(User.changeset(user))
+  end
+
+  def update_user(user, attrs) do
+    user
+    |> User.changeset(attrs)
+    |> Repo.update()
   end
 end

@@ -16,7 +16,7 @@ defmodule Golf.Games do
 
   @events_query from(e in Event, order_by: [desc: :id])
   @players_query from(p in Player, order_by: p.turn)
-  @game_preloads [:opts, rounds: [events: {@events_query, [:player]}], players: @players_query]
+  @game_preloads [:opts, rounds: [events: {@events_query, [:player]}], players: {@players_query, [:user]}]
 
   def get_game(id, preloads \\ @game_preloads) do
     Repo.get(Game, id)
@@ -395,24 +395,25 @@ defmodule Golf.Games do
   # Each hand consists of two rows of three cards.
   # If the cards in a column match they are worth 0 points so we discard them and recurse with the remaining cards.
   # The remaining cards don't match so we total their individual values.
+  # Face down cards are represented by nil and will be ignored.
   defp score_ranks(ranks, total) do
     case ranks do
-      # all match
+      # all match, -40 points
       [a, a, a,
        a, a, a] when is_integer(a) ->
         -40
 
-      # outer cols match
+      # outer cols match, -20 points
       [a, b, a,
        a, c, a] when is_integer(a) ->
         score_ranks([b, c], total - 20)
 
-      # left 2 cols match
+      # left 2 cols match, -10 points
       [a, a, b,
        a, a, c] when is_integer(a) ->
         score_ranks([b, c], total - 10)
 
-      # right 2 cols match
+      # right 2 cols match, -10 points
       [a, b, b,
        c, b, b] when is_integer(b) ->
         score_ranks([a, c], total - 10)
@@ -447,7 +448,7 @@ defmodule Golf.Games do
        a] when is_integer(a) ->
         total
 
-      # no matches, add the val of each card rank
+      # no matches, add the val of each card rank and the total
       _ ->
         ranks
         |> Enum.reject(&is_nil/1)

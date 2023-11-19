@@ -9,6 +9,7 @@ loadTextures();
 let hooks = {};
 let gameContext;
 
+// The div this connects to is in GolfWeb.GameLive.
 hooks.GameCanvas = {
   mounted() {
     this.handleEvent("game-loaded", data => {

@@ -8,7 +8,7 @@ defmodule GolfWeb.GameLive do
   def render(assigns) do
     ~H"""
     <h2>Game</h2>
-    <h3><%= String.upcase(@game_id) %></h3>
+    <h3 class="uppercase"><%= @game_id %></h3>
 
     <div id="game-wrapper">
       <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
@@ -24,7 +24,7 @@ defmodule GolfWeb.GameLive do
   defp player_score(assigns) do
     ~H"""
     <div class={"player-score #{@player.position}"}>
-      id=<%= @player.id %>(score=<%= @player.score %>)
+      <%= @player.username %>(score=<%= @player.score %>)
     </div>
     """
   end
@@ -52,7 +52,6 @@ defmodule GolfWeb.GameLive do
       {:ok, game} ->
         can_start? = user.id == game.host_id && !Games.current_round(game)
         data = Games.Data.from(game, user.id)
-
         :ok = subscribe(id)
 
         {:noreply,

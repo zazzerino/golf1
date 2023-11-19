@@ -31,6 +31,11 @@ defmodule GolfWeb.LobbyLive do
     """
   end
 
+  # defp opts_form(assigns) do
+  #   ~H"""
+  #   """
+  # end
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     if connected?(socket) do

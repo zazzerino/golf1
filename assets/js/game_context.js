@@ -118,7 +118,7 @@ export class GameContext {
 
       const texture = this.textures[name];
       const coord = handCardCoord(player.position, i);
-      const sprite = makeCardSprite(texture, coord.x, coord.y);
+      const sprite = makeCardSprite(texture, coord.x, coord.y, coord.rotation);
 
       this.sprites.hands[player.position][i] = sprite;
       this.stage.addChild(sprite);
