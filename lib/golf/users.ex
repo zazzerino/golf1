@@ -10,7 +10,9 @@ defmodule Golf.Users do
     Repo.get(User, user_id)
   end
 
-  def get_users([_ | _] = user_ids) do
+  def get_users([]), do: []
+
+  def get_users(user_ids) do
     from(u in User, where: u.id in ^user_ids)
     |> Repo.all()
   end

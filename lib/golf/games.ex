@@ -2,7 +2,6 @@ defmodule Golf.Games do
   import Ecto.Query
 
   alias Golf.Repo
-  alias Golf.Users.User
   alias Golf.Games.{Game, Event, Player, Round, Opts}
 
   @type id :: Ecto.UUID.t()
@@ -23,8 +22,6 @@ defmodule Golf.Games do
     |> Repo.preload(preloads)
   end
 
-  @spec fetch_game(id) :: {:ok, %Game{}} | {:error, any}
-
   def fetch_game(id, preloads \\ @game_preloads) do
     case get_game(id, preloads) do
       nil -> {:error, :not_found}
@@ -37,16 +34,13 @@ defmodule Golf.Games do
     %Player{user_id: user.id, turn: turn}
   end
 
-  @spec new_game(id, list(%User{}), %Opts{}) :: %Game{}
-
-  def new_game(id, [host | _] = users, opts \\ %Opts{}) do
+  def new_game([host | _] = users, opts \\ %Opts{}) do
     players =
       users
       |> Enum.with_index()
       |> Enum.map(&player_from/1)
 
     %Game{
-      id: id,
       host_id: host.id,
       opts: opts,
       players: players,
@@ -54,20 +48,15 @@ defmodule Golf.Games do
     }
   end
 
-  @spec create_game(id, list(%User{}), %Opts{}) :: {:ok, %Game{}} | {:error, any}
-
-  def create_game(id, users, opts) do
-    new_game(id, users, opts)
+  def create_game(users, opts) do
+    new_game(users, opts)
     |> Game.changeset()
     |> Repo.insert()
   end
 
   def new_round(%Game{id: game_id, players: players}) do
     num_players = length(players)
-
-    deck =
-      new_deck(@num_decks)
-      |> Enum.shuffle()
+    deck = Enum.shuffle(new_deck(@num_decks))
 
     num_hand_cards = @hand_size * num_players
     {:ok, hand_cards, deck} = deal_from_deck(deck, num_hand_cards)
@@ -448,12 +437,11 @@ defmodule Golf.Games do
        a] when is_integer(a) ->
         total
 
-      # no matches, add the val of each card rank and the total
+      # no matches, add the rank val of each card and the total
       _ ->
         ranks
         |> Enum.reject(&is_nil/1)
-        |> Enum.reduce(0, fn name, acc -> rank_value(name) + acc end)
-        |> Kernel.+(total)
+        |> Enum.reduce(total, fn rank, acc -> rank_value(rank) + acc end)
     end
   end
 

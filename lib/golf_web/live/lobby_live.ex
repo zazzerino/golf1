@@ -1,13 +1,15 @@
 defmodule GolfWeb.LobbyLive do
   use GolfWeb, :live_view
-  alias Golf.{Games, Lobbies}
+
+  alias Golf.Lobbies
   alias Golf.Games.Opts
+
+  defp topic(id), do: "lobby:#{id}"
 
   @impl true
   def render(assigns) do
     ~H"""
-    <h2>Lobby</h2>
-    <h3>ID: <%= String.upcase(@lobby_id) %></h3>
+    <h2>Lobby <%= @link_id %></h2>
 
     <div :if={@lobby}>
       <h4 class="mt-2">Players</h4>
@@ -31,21 +33,16 @@ defmodule GolfWeb.LobbyLive do
     """
   end
 
-  # defp opts_form(assigns) do
-  #   ~H"""
-  #   """
-  # end
-
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => link_id}, _session, socket) do
     if connected?(socket) do
-      send(self(), {:load_lobby, id})
+      send(self(), {:load_lobby, link_id})
     end
 
     {:ok,
      assign(socket,
        page_title: "Lobby",
-       lobby_id: id,
+       link_id: link_id,
        lobby: nil,
        host?: nil,
        can_join?: nil
@@ -53,16 +50,16 @@ defmodule GolfWeb.LobbyLive do
   end
 
   @impl true
-  def handle_info({:load_lobby, id}, %{assigns: %{user: user}} = socket) do
-    case Lobbies.get_lobby(id) do
+  def handle_info({:load_lobby, link_id}, %{assigns: %{user: user}} = socket) do
+    case Golf.Links.get_lobby(link_id) do
       nil ->
         {:noreply,
          socket
          |> push_navigate(to: ~p"/")
-         |> put_flash(:error, "Lobby #{id} not found.")}
+         |> put_flash(:error, "Lobby #{link_id} not found.")}
 
       lobby ->
-        :ok = subscribe(id)
+        :ok = Golf.subscribe(topic(lobby.id))
 
         {:noreply,
          assign(socket,
@@ -86,37 +83,27 @@ defmodule GolfWeb.LobbyLive do
   end
 
   @impl true
-  def handle_info(:game_created, %{assigns: %{lobby_id: id}} = socket) do
-    {:noreply, push_navigate(socket, to: ~p"/games/#{id}")}
+  def handle_info(:game_created, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/game/#{socket.assigns.link_id}")}
+  end
+
+  @impl true
+  def handle_event("join-lobby", _params, %{assigns: %{lobby: lobby, user: user}} = socket) do
+    {:ok, lobby} = Lobbies.add_lobby_user(lobby, user)
+    :ok = Golf.broadcast(topic(lobby.id), {:user_joined, lobby, user})
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event(
         "start-game",
         %{"num-rounds" => num_rounds},
-        %{assigns: %{lobby: lobby}} = socket
+        %{assigns: %{lobby: lobby, link_id: link_id}} = socket
       ) do
     {num_rounds, _} = Integer.parse(num_rounds)
     opts = %Opts{num_rounds: num_rounds}
-    {:ok, game} = Games.create_game(lobby.id, lobby.users, opts)
-    :ok = broadcast(lobby.id, :game_created)
-    {:noreply, push_navigate(socket, to: ~p"/games/#{game.id}")}
-  end
-
-  @impl true
-  def handle_event("join-lobby", _params, %{assigns: %{lobby: lobby, user: user}} = socket) do
-    {:ok, lobby} = Lobbies.add_lobby_user(lobby, user)
-    :ok = broadcast(lobby.id, {:user_joined, lobby, user})
-    {:noreply, socket}
-  end
-
-  defp topic(id), do: "lobby:#{id}"
-
-  defp subscribe(id) do
-    Phoenix.PubSub.subscribe(Golf.PubSub, topic(id))
-  end
-
-  defp broadcast(id, msg) do
-    Phoenix.PubSub.broadcast(Golf.PubSub, topic(id), msg)
+    {:ok, _game} = Golf.Links.create_game_link(link_id, lobby.users, opts)
+    :ok = Golf.broadcast_from(topic(lobby.id), :game_created)
+    {:noreply, push_navigate(socket, to: ~p"/game/#{link_id}")}
   end
 end

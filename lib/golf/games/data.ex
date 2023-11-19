@@ -33,7 +33,7 @@ defmodule Golf.Games.Data do
       |> Golf.maybe_rotate(index)
       |> Games.put_positions(positions)
       |> Games.put_scores(hands)
-      |> Enum.map(&%{&1 | username: &1.user.name})
+      |> Enum.map(&put_username/1)
       |> put_hands(hands)
       |> put_held_card(round && round.held_card)
 
@@ -84,4 +84,8 @@ defmodule Golf.Games.Data do
   end
 
   defp do_put_held(player, _), do: player
+
+  defp put_username(player) do
+    %{player | username: player.user.name}
+  end
 end

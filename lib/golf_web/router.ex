@@ -18,8 +18,8 @@ defmodule GolfWeb.Router do
     live_session :default, on_mount: GolfWeb.Auth do
       live "/", HomeLive
       live "/user", UserLive
+      live "/game/:id", GameLive
       live "/lobby/:id", LobbyLive
-      live "/games/:id", GameLive
     end
   end
 

@@ -3,8 +3,6 @@ defmodule Golf.Lobbies.Lobby do
   use Golf.Schema
   alias Golf.Users.User
 
-  @primary_key {:id, Ecto.UUID, []}
-
   schema "lobbies" do
     belongs_to :host, User
     many_to_many :users, User, join_through: Golf.Lobbies.LobbyUser
@@ -13,7 +11,7 @@ defmodule Golf.Lobbies.Lobby do
 
   def changeset(lobby, attrs \\ %{}) do
     lobby
-    |> cast(attrs, [:id, :host_id])
-    |> validate_required([:id, :host_id])
+    |> cast(attrs, [:host_id])
+    |> validate_required([:host_id])
   end
 end

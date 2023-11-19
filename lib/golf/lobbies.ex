@@ -25,8 +25,8 @@ defmodule Golf.Lobbies do
     |> Repo.preload(users: lobby_users_query(id))
   end
 
-  def create_lobby(id, host) do
-    %Lobby{id: id, host_id: host.id, users: [host]}
+  def create_lobby(host) do
+    %Lobby{host_id: host.id, users: [host]}
     |> Lobby.changeset()
     |> Repo.insert()
   end

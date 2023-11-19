@@ -5,7 +5,7 @@ defmodule Golf.Lobbies.LobbyUser do
   @primary_key false
 
   schema "lobbies_users" do
-    belongs_to :lobby, Golf.Lobbies.Lobby, type: Ecto.UUID
+    belongs_to :lobby, Golf.Lobbies.Lobby
     belongs_to :user, Golf.Users.User
     timestamps()
   end

@@ -2,18 +2,17 @@ defmodule Golf.Repo.Migrations.CreateLobbiesTable do
   use Ecto.Migration
 
   def change do
-    create table("lobbies", primary_key: false) do
-      add :id, :uuid, primary_key: true, null: false
+    create table("lobbies") do
       add :host_id, references("users")
       timestamps()
     end
 
     create table("lobbies_users", primary_key: false) do
+      add :lobby_id, references("lobbies")
       add :user_id, references("users")
-      add :lobby_id, references("lobbies", type: :uuid)
       timestamps()
     end
 
-    create unique_index("lobbies_users", [:user_id, :lobby_id])
+    create unique_index("lobbies_users", [:lobby_id, :user_id])
   end
 end

@@ -5,7 +5,7 @@ defmodule Golf.Games.Round do
   @states [:flip_2, :take, :hold, :flip, :over]
 
   schema "rounds" do
-    belongs_to :game, Golf.Games.Game, type: :binary_id
+    belongs_to :game, Golf.Games.Game
     has_many :events, Golf.Games.Event
 
     field :state, Ecto.Enum, values: @states

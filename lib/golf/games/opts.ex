@@ -3,7 +3,7 @@ defmodule Golf.Games.Opts do
   import Ecto.Changeset
 
   schema "opts" do
-    belongs_to :game, Golf.Games.Game, type: :binary_id
+    belongs_to :game, Golf.Games.Game
     field :num_rounds, :integer, default: 1
     timestamps()
   end

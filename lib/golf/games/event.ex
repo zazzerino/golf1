@@ -3,7 +3,6 @@ defmodule Golf.Games.Event do
   import Ecto.Changeset
   alias Golf.Games.{Game, Round}
 
-  # @type action :: :take_from_deck | :take_from_table | :swap | :discard | :flip
   @actions [:take_from_deck, :take_from_table, :swap, :discard, :flip]
 
   @derive {Jason.Encoder, only: [:round_id, :player_id, :action, :hand_index]}
@@ -20,8 +19,6 @@ defmodule Golf.Games.Event do
     |> cast(attrs, [:round_id, :player_id, :action, :hand_index])
     |> validate_required([:round_id, :player_id, :action])
   end
-
-  def new(game_or_round, player, action, hand_index \\ nil)
 
   def new(%Game{rounds: [round | _]}, player, action, hand_index) do
     new(round, player, action, hand_index)
