@@ -29,6 +29,9 @@ defmodule Golf.Users do
     |> Repo.update()
   end
 
+  @doc """
+  Returns a link to every game the user has played.
+  """
   def get_links(user_id) do
     from(u in User,
       where: [id: ^user_id],

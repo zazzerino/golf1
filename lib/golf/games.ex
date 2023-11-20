@@ -28,8 +28,7 @@ defmodule Golf.Games do
 
   def new_game([host | _] = users, opts \\ %Opts{}) do
     players =
-      users
-      |> Enum.with_index()
+      Enum.with_index(users)
       |> Enum.map(fn {user, i} -> %Player{user_id: user.id, turn: i} end)
 
     %Game{
@@ -46,9 +45,9 @@ defmodule Golf.Games do
     |> Repo.insert()
   end
 
-  def new_round(%Game{id: game_id, players: players}) do
+  def new_round(game) do
     deck = Enum.shuffle(new_deck(@num_decks))
-    num_hand_cards = @hand_size * length(players)
+    num_hand_cards = @hand_size * length(game.players)
 
     {:ok, hand_cards, deck} = deal_from_deck(deck, num_hand_cards)
     {:ok, table_card, deck} = deal_from_deck(deck)
@@ -59,7 +58,7 @@ defmodule Golf.Games do
       |> Enum.chunk_every(@hand_size)
 
     %Round{
-      game_id: game_id,
+      game_id: game.id,
       state: :flip_2,
       turn: 0,
       deck: deck,
@@ -325,6 +324,7 @@ defmodule Golf.Games do
     end
   end
 
+  defp places(_state, _flipped?, _hand)
   defp places(:take, true, hand), do: [:deck, :table] ++ face_down_cards(hand)
   defp places(:take, false, _), do: [:deck, :table]
   defp places(:flip, _, hand), do: face_down_cards(hand)
@@ -357,7 +357,7 @@ defmodule Golf.Games do
 
   # Each hand consists of two rows of three cards.
   # Face down cards are represented by nil and ignored.
-  # If the cards are face up and in a matching column, they are worth 0 points and are discarded.
+  # If the cards are face up and in a matching column, they are worth 0 points and discarded.
 
   # Special cases:
   #   6 of a kind -> -40 pts
@@ -417,7 +417,7 @@ defmodule Golf.Games do
        a] when is_integer(a) ->
         total
 
-      # no matches, add the rank val of each card and the total
+      # no matches, add the rank val of each face up card to the total
       _ ->
         ranks
         |> Enum.reject(&is_nil/1)

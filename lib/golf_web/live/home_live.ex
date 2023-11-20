@@ -47,13 +47,21 @@ defmodule GolfWeb.HomeLive do
 
   @impl true
   def handle_event("join-lobby", %{"id" => link_id}, socket) do
+    link_id = String.upcase(link_id)
+
     case Golf.Links.get_lobby(link_id) do
       nil ->
         {:noreply, put_flash(socket, :error, "Game #{link_id} not found.")}
 
       lobby ->
         {:ok, _} = Golf.Lobbies.add_lobby_user(lobby, socket.assigns.user)
-        :ok = Golf.broadcast("lobby:#{lobby.id}", {:user_joined, socket.assigns.user})
+
+        :ok =
+          Golf.broadcast(
+            GolfWeb.LobbyLive.topic(lobby.id),
+            {:user_joined, socket.assigns.user}
+          )
+
         {:noreply, push_navigate(socket, to: ~p"/lobby/#{link_id}")}
     end
   end

@@ -39,10 +39,10 @@ defmodule Golf.Games.Data do
     players =
       game.players
       |> Golf.maybe_rotate(index)
-      |> Enum.zip_with(hands, &put_hand_score/2)
       |> Enum.zip_with(positions, &Map.put(&1, :position, &2))
       |> Enum.map(&Map.put(&1, :username, &1.user.name))
       |> Enum.map(&put_held_card(&1, held_card))
+      |> put_hands(hands)
 
     %__MODULE__{
       id: game.id,
@@ -66,8 +66,14 @@ defmodule Golf.Games.Data do
     end
   end
 
-  def put_hand_score(player, nil) do
-    %{player | hand: [], score: 0}
+  defp put_hands(players, []) do
+    Enum.map(players, fn p ->
+      Map.put(p, :score, 0)
+    end)
+  end
+
+  defp put_hands(players, hands) do
+    Enum.zip_with(players, hands, &put_hand_score/2)
   end
 
   def put_hand_score(player, hand) do

@@ -4,7 +4,7 @@ defmodule GolfWeb.LobbyLive do
   alias Golf.Lobbies
   alias Golf.Games.Opts
 
-  defp topic(id), do: "lobby:#{id}"
+  def topic(id), do: "lobby:#{id}"
 
   @impl true
   def render(assigns) do
@@ -89,7 +89,8 @@ defmodule GolfWeb.LobbyLive do
      assign(socket,
        lobby: lobby,
        can_join?: not Enum.any?(lobby.users, &(&1.id == user.id))
-     )}
+     )
+     |> put_flash(:info, "User joined: #{new_user.name}(id=#{new_user.id})")}
   end
 
   @impl true

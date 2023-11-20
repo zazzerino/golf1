@@ -5,11 +5,28 @@ import {
   CENTER_X, DECK_X, DECK_Y, DECK_Y_OFFSET, TABLE_CARD_X, TABLE_CARD_Y, HAND_SIZE 
 } from "./game_canvas";
 
-export function tweenHand(pos, handSprites) {
+export function tweenWiggle(sprite, duration = 150, distance = 1, repeats = 2) {
+  const startX = sprite.x;
+
+  const tweenReturn = new Tween(sprite)
+    .to({ x: startX }, duration / 2)
+    .easing(Easing.Quadratic.Out);
+
+  sprite.x = startX - distance;
+
+  return new Tween(sprite)
+    .to({ x: startX + distance }, duration / repeats)
+    .easing(Easing.Quintic.InOut)
+    .repeat(repeats)
+    .yoyo(true)
+    .chain(tweenReturn);
+}
+
+export function handTweens(pos, handSprites) {
   const tweens = [];
 
   // start with the last card in the hand (bottom right)
-  for (let i = handSprites.length - 1; i >= 0; i--) {
+  for (let i = HAND_SIZE-1; i >= 0; i--) {
     const sprite = handSprites[i];
 
     const x = sprite.x;
@@ -23,7 +40,7 @@ export function tweenHand(pos, handSprites) {
     const tween = new Tween(sprite)
       .to({ x, y, rotation }, 800)
       .easing(Easing.Cubic.InOut)
-      .delay((HAND_SIZE-1-i) * 120);
+      .delay((HAND_SIZE-1-i) * 150);
 
     tweens.push(tween);
   }
@@ -33,19 +50,19 @@ export function tweenHand(pos, handSprites) {
 
 export function tweenDeck(deckSprite) {
   return new Tween(deckSprite)
-    .to({ x: DECK_X }, 180)
+    .to({ x: DECK_X }, 200)
     .easing(Easing.Quadratic.Out);
 }
 
-export function tweenTableDeck(tableSprite) {
+export function tweenTable(tableSprite) {
   tableSprite.x = DECK_X;
 
   return new Tween(tableSprite)
-    .to({ x: TABLE_CARD_X }, 350)
+    .to({ x: TABLE_CARD_X }, 400)
     .easing(Easing.Quadratic.Out);
 }
 
-export function tweenHeldDeck(pos, heldSprite, deckSprite) {
+export function tweenTakeDeck(pos, heldSprite, deckSprite) {
   const x = heldSprite.x;
   const y = heldSprite.y;
   const rotation = rotationAt(pos);
@@ -55,11 +72,11 @@ export function tweenHeldDeck(pos, heldSprite, deckSprite) {
   heldSprite.rotation = 0;
 
   return new Tween(heldSprite)
-    .to({ x, y, rotation }, 800)
+    .to({ x, y, rotation }, 750)
     .easing(Easing.Quadratic.InOut);
 }
 
-export function tweenHeldTable(pos, heldSprite, tableSprite) {
+export function tweenTakeTable(pos, heldSprite, tableSprite) {
   const x = heldSprite.x;
   const y = heldSprite.y;
   const rotation = rotationAt(pos);
@@ -70,11 +87,11 @@ export function tweenHeldTable(pos, heldSprite, tableSprite) {
 
   return new Tween(heldSprite)
     .onStart(() => tableSprite.visible = false)
-    .to({ x, y, rotation }, 800)
+    .to({ x, y, rotation }, 750)
     .easing(Easing.Quadratic.InOut);
 }
 
-export function tweenTableDiscard(pos, tableSprite, heldSprite) {
+export function tweenDiscard(pos, tableSprite, heldSprite) {
   heldSprite.visible = false;
 
   const x = tableSprite.x;
@@ -85,7 +102,7 @@ export function tweenTableDiscard(pos, tableSprite, heldSprite) {
   tableSprite.rotation = rotationAt(pos);
 
   return new Tween(tableSprite)
-    .to({ x, y, rotation: 0 }, 800)
+    .to({ x, y, rotation: 0 }, 750)
     .easing(Easing.Quadratic.InOut);
 }
 
@@ -106,7 +123,7 @@ export function tweenSwapHeld(pos, heldSprite, handSprite, tableSprite) {
     });
 
   const tableTween = new Tween(tableSprite)
-    .to({ x: TABLE_CARD_X, y: TABLE_CARD_Y, rotation: 0 }, 700)
+    .to({ x: TABLE_CARD_X, y: TABLE_CARD_Y, rotation: 0 }, 750)
     .easing(Easing.Quadratic.InOut)
     .delay(200);
 

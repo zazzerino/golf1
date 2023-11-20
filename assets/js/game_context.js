@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 import { update as updateTweens } from "@tweenjs/tween.js";
 
 import {
-  GAME_WIDTH, GAME_HEIGHT, TABLE_CARD_X, TABLE_CARD_Y, 
+  GAME_WIDTH, GAME_HEIGHT, TABLE_CARD_X, TABLE_CARD_Y,
   handCardCoord, heldCardCoord
 } from "./game_canvas";
 
@@ -10,8 +10,8 @@ import {
   makeCardSprite, makeDeckSprite, makePlayable, makeTableSprite, makeUnplayable
 } from "./sprites";
 
-import { 
-  tweenDeck, tweenHand, tweenHeldDeck, tweenHeldTable, tweenTableDeck
+import {
+  handTweens, tweenDeck, tweenTakeDeck, tweenTakeTable, tweenTable, tweenWiggle, tweenDiscard
 } from "./tweens";
 
 const HAND_SIZE = 6;
@@ -157,9 +157,8 @@ export class GameContext {
 
     for (const player of this.game.players) {
       this.addHand(player);
-      const pos = player.position;
 
-      tweenHand(pos, this.sprites.hands[pos])
+      handTweens(player.position, this.sprites.hands[player.position])
         .forEach((tween, i) => {
           tween.start();
 
@@ -170,7 +169,7 @@ export class GameContext {
                 .start()
                 .onComplete(() => {
                   this.addTableCards();
-                  tweenTableDeck(this.sprites.table[0]).start();
+                  tweenTable(this.sprites.table[0]).start();
                 });
             });
           }
@@ -212,6 +211,8 @@ export class GameContext {
     const handSprite = handSprites[event.hand_index];
     handSprite.texture = this.textures[cardName];
 
+    tweenWiggle(handSprite).start();
+
     for (let i = 0; i < HAND_SIZE; i++) {
       if (!this.isPlayable(`hand_${i}`)) {
         makeUnplayable(handSprites[i]);
@@ -234,7 +235,7 @@ export class GameContext {
 
     const heldSprite = this.addHeldCard(player);
 
-    tweenHeldDeck(player.position, heldSprite, this.sprites.deck).start();
+    tweenTakeDeck(player.position, heldSprite, this.sprites.deck).start();
 
     if (player.id === this.game.playerId) {
       makePlayable(heldSprite, this.onHeldClick.bind(this));
@@ -257,8 +258,8 @@ export class GameContext {
 
     const heldSprite = this.addHeldCard(player);
     const tableSprite = this.sprites.table.shift();
-    
-    tweenHeldTable(player.position, heldSprite, tableSprite).start();
+
+    tweenTakeTable(player.position, heldSprite, tableSprite).start();
 
     if (player.id === this.game.playerId) {
       makeUnplayable(this.sprites.deck);
@@ -275,8 +276,8 @@ export class GameContext {
     if (!player) throw new Error("player is null on discard");
 
     this.addTableCards();
-    this.sprites.held.visible = false;
-    // tweenTableDiscard(player.position, this.sprites.table[0], this.sprites.held).start();
+    // this.sprites.held.visible = false;
+    tweenDiscard(player.position, this.sprites.table[0], this.sprites.held).start();
 
     this.sprites.hands[player.position].forEach((sprite, i) => {
       if (!this.isPlayable(`hand_${i}`)) {

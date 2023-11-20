@@ -4,7 +4,7 @@ defmodule GolfWeb.GameLive do
   alias Golf.Games
   alias Golf.Games.{Event, Player}
 
-  defp topic(id), do: "game:#{id}"
+  def topic(id), do: "game:#{id}"
 
   @impl true
   def render(assigns) do
@@ -121,11 +121,10 @@ defmodule GolfWeb.GameLive do
   defp handle_game_event(game, place, player_id, hand_index \\ nil) do
     %Player{} = player = Enum.find(game.players, &(&1.id == player_id))
 
-    action =
-      Games.current_state(game)
-      |> action_at(place)
-
+    state = Games.current_state(game)
+    action = action_at(state, place)
     event = Event.new(game, player, action, hand_index)
+
     {:ok, game} = Games.handle_event(game, event)
     :ok = Golf.broadcast(topic(game.id), {:game_event, game, event})
   end
