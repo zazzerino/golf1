@@ -1,52 +1,15 @@
 defmodule GolfWeb.UserLive do
   use GolfWeb, :live_view
+  import GolfWeb.Components, only: [username_form: 1, links_table: 1]
   alias Golf.Users.User
 
   @impl true
   def render(assigns) do
     ~H"""
-    <h2 class="font-bold mb-2">User</h2>
-    <div>User(id=<%= @user.id %>)</div>
+    <h2 class="font-bold text-2xl mb-2">User</h2>
+    <div class="mb-2">User(id=<%= @user.id %>, name=<%= @user.name %>)</div>
     <.username_form form={@name_form} />
     <.links_table :if={@links != []} links={@links} />
-    """
-  end
-
-  defp username_form(assigns) do
-    ~H"""
-    <.simple_form for={@form} phx-change="validate-name" phx-submit="update-name">
-      <.input field={@form[:name]} label="Name" required />
-      <:actions>
-        <.button>Save</.button>
-      </:actions>
-    </.simple_form>
-    """
-  end
-
-  def links_table(assigns) do
-    ~H"""
-    <div class="mt-10 overflow-y-auto max-h-[350px]">
-      <h3 class="font-bold mb-2">Games</h3>
-      <table class="w-[20rem]">
-        <thead class="text-sm text-left">
-          <tr>
-            <th>ID</th>
-            <th>Created At</th>
-          </tr>
-        </thead>
-        <tbody class="text-left divide-y">
-          <tr
-            :for={link <- @links}
-            phx-click="link-row-click"
-            phx-value-link={link.id}
-            class="divide-x hover:cursor-pointer"
-          >
-            <td><%= link.id %></td>
-            <td><%= link.inserted_at %></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
     """
   end
 

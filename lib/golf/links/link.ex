@@ -7,6 +7,7 @@ defmodule Golf.Links.Link do
   schema "game_links" do
     belongs_to :lobby, Golf.Lobbies.Lobby
     belongs_to :game, Golf.Games.Game
+    has_many :messages, Golf.Chat.Message
     timestamps()
   end
 

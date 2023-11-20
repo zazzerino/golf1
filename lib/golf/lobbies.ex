@@ -8,7 +8,7 @@ defmodule Golf.Lobbies do
   @max_players 4
 
   @doc """
-  Sorts users by the time they joined the lobby.
+  Get and sort users by the time they joined the lobby.
   """
   def lobby_users_query(lobby_id) do
     from(u in User,

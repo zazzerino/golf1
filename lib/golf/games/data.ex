@@ -26,6 +26,7 @@ defmodule Golf.Games.Data do
     positions = hand_positions(num_players)
 
     round = Games.current_round(game)
+    turn = if round, do: round.turn
     hands = if round, do: Golf.maybe_rotate(round.hands, index), else: []
     held_card = if round, do: round.held_card
 
@@ -39,16 +40,16 @@ defmodule Golf.Games.Data do
     players =
       game.players
       |> Golf.maybe_rotate(index)
+      |> put_hands(hands)
       |> Enum.zip_with(positions, &Map.put(&1, :position, &2))
       |> Enum.map(&Map.put(&1, :username, &1.user.name))
       |> Enum.map(&put_held_card(&1, held_card))
-      |> put_hands(hands)
 
     %__MODULE__{
       id: game.id,
-      state: round && round.state,
+      turn: turn,
+      state: Games.current_state(game),
       isFlipped: round && round.flipped?,
-      turn: round && round.turn,
       deck: (round && round.deck) || [],
       tableCards: (round && round.table_cards) || [],
       players: players,
@@ -67,22 +68,17 @@ defmodule Golf.Games.Data do
   end
 
   defp put_hands(players, []) do
-    Enum.map(players, fn p ->
-      Map.put(p, :score, 0)
-    end)
+    Enum.map(players, fn p -> %{p | hand: [], score: 0} end)
   end
 
   defp put_hands(players, hands) do
-    Enum.zip_with(players, hands, &put_hand_score/2)
+    Enum.zip_with(players, hands, fn p, hand ->
+      %{p | hand: hand, score: Games.score(hand)}
+    end)
   end
 
-  def put_hand_score(player, hand) do
-    %{player | hand: hand, score: Games.score(hand)}
-  end
-
-  defp put_held_card(player, %{"player_id" => card_id} = card)
-       when player.id == card_id do
-    %{player | heldCard: card["name"]}
+  defp put_held_card(p, %{"player_id" => card_id} = card) when p.id == card_id do
+    %{p | heldCard: card["name"]}
   end
 
   defp put_held_card(player, _), do: player

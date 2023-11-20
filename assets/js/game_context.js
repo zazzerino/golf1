@@ -71,7 +71,7 @@ export class GameContext {
   addSprites() {
     this.addDeck();
 
-    if (this.game.state) {
+    if (this.game.state !== "no_round") {
       this.addTableCards();
 
       for (const player of this.game.players) {

@@ -1,6 +1,6 @@
 defmodule GolfWeb.GameLive do
   use GolfWeb, :live_view
-
+  import GolfWeb.Components, only: [chat: 1, player_score: 1]
   alias Golf.Games
   alias Golf.Games.{Event, Player}
 
@@ -9,7 +9,9 @@ defmodule GolfWeb.GameLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <h2>Game <%= @link_id %></h2>
+    <h2 class="text-2xl mb-2">
+      <span class="font-bold">Game</span> <%= @link_id %>
+    </h2>
 
     <div id="game-wrapper">
       <div id="game-canvas" phx-hook="GameCanvas" phx-update="ignore"></div>
@@ -21,21 +23,16 @@ defmodule GolfWeb.GameLive do
     <.button :if={@can_start?} class="mt-2" phx-click="start-round">
       Start Round
     </.button>
-    """
-  end
 
-  defp player_score(assigns) do
-    ~H"""
-    <div class={"player-score #{@player.position}"}>
-      <%= @player.username %>(score=<%= @player.score %>)
-    </div>
+    <.chat messages={@streams.messages} submit="submit-chat" />
     """
   end
 
   @impl true
-  def mount(%{"id" => link_id}, _session, socket) do
+  def mount(%{"link_id" => link_id}, _session, socket) do
     if connected?(socket) do
       send(self(), {:load_game, link_id})
+      send(self(), {:load_messages, link_id})
     end
 
     {:ok,
@@ -46,7 +43,8 @@ defmodule GolfWeb.GameLive do
        players: [],
        player: nil,
        can_start?: nil
-     )}
+     )
+     |> stream(:messages, [])}
   end
 
   @impl true
@@ -69,6 +67,12 @@ defmodule GolfWeb.GameLive do
   end
 
   @impl true
+  def handle_info({:load_messages, link_id}, socket) do
+    messages = Golf.Chat.get_messages(link_id)
+    {:noreply, stream(socket, :messages, messages)}#, at: 0)}
+  end
+
+  @impl true
   def handle_info({:round_started, game}, socket) do
     {:noreply,
      socket
@@ -82,8 +86,7 @@ defmodule GolfWeb.GameLive do
 
     {:noreply,
      socket
-     |> assign(game: game)
-     |> assign(players: data.players)
+     |> assign(game: game, players: data.players)
      |> push_event("game-event", %{"game" => data, "event" => event})}
   end
 
@@ -92,6 +95,19 @@ defmodule GolfWeb.GameLive do
     {:ok, game} = Games.start_round(socket.assigns.game)
     :ok = Golf.broadcast(topic(game.id), {:round_started, game})
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("submit-chat", %{"content" => content}, socket) do
+    {:ok, message} =
+      Golf.Chat.Message.new(
+        socket.assigns.link_id,
+        socket.assigns.user,
+        content
+      )
+      |> Golf.Chat.insert_message()
+
+    {:noreply, stream_insert(socket, :messages, message)}
   end
 
   @impl true

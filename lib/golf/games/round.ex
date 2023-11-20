@@ -2,7 +2,7 @@ defmodule Golf.Games.Round do
   use Golf.Schema
   import Ecto.Changeset
 
-  @states [:flip_2, :take, :hold, :flip, :over]
+  @states [:flip_2, :take, :hold, :flip, :round_over]
 
   schema "rounds" do
     belongs_to :game, Golf.Games.Game

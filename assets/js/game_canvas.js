@@ -42,7 +42,7 @@ export function rotationAt(pos) {
 // sprite coords
 
 export function deckX(state) {
-  return state ? DECK_X : CENTER_X;
+  return state !== "no_round" ? DECK_X : CENTER_X;
 }
 
 export function heldCardCoord(pos, yPad = HAND_Y_PAD) {

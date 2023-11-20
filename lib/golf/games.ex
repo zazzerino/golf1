@@ -113,6 +113,10 @@ defmodule Golf.Games do
   def current_round(%Game{rounds: [round | _]}), do: round
   def current_round(_), do: nil
 
+  def current_state(game) when length(game.rounds) > game.opts.num_rounds do
+    :game_over
+  end
+
   def current_state(%Game{rounds: []}), do: :no_round
   def current_state(%Game{rounds: [round | _]}), do: round.state
 
@@ -122,7 +126,7 @@ defmodule Golf.Games do
     can_act_round?(round, player, length(game.players))
   end
 
-  def can_act_round?(%Round{state: :over}, _, _), do: false
+  def can_act_round?(%Round{state: :round_over}, _, _), do: false
 
   def can_act_round?(%Round{state: :flip_2} = round, player, _) do
     hand = Enum.at(round.hands, player.turn)
@@ -139,7 +143,7 @@ defmodule Golf.Games do
     {:error, :no_round}
   end
 
-  def handle_event(%Game{rounds: [%Round{state: :over} | _]}, _) do
+  def handle_event(%Game{rounds: [%Round{state: :round_over} | _]}, _) do
     {:error, :round_over}
   end
 
@@ -188,7 +192,7 @@ defmodule Golf.Games do
     {state, turn, flipped?} =
       cond do
         Enum.all?(hands, &all_face_up?/1) ->
-          {:over, round.turn, true}
+          {:round_over, round.turn, true}
 
         all_face_up?(hand) ->
           {:take, round.turn + 1, true}
@@ -255,7 +259,7 @@ defmodule Golf.Games do
 
     {state, turn} =
       if Enum.all?(hands, &all_face_up?/1) do
-        {:over, round.turn}
+        {:round_over, round.turn}
       else
         {:take, round.turn + 1}
       end
@@ -284,7 +288,7 @@ defmodule Golf.Games do
     {state, turn, flipped?} =
       cond do
         Enum.all?(hands, &all_face_up?/1) ->
-          {:over, round.turn, true}
+          {:round_over, round.turn, true}
 
         all_face_up?(hand) ->
           {:take, round.turn + 1, true}

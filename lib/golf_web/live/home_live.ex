@@ -1,30 +1,20 @@
 defmodule GolfWeb.HomeLive do
   use GolfWeb, :live_view
+  import GolfWeb.Components, only: [join_lobby_form: 1]
 
   @link_length 6
 
   @impl true
   def render(assigns) do
     ~H"""
-    <h2>Home</h2>
+    <h2 class="font-bold text-2xl mb-2">Home</h2>
     <p>Hello <%= @user.name %>(id=<%= @user.id %>)</p>
 
     <.button class="my-2" phx-click="create-lobby">
       Create Game
     </.button>
 
-    <.join_form />
-    """
-  end
-
-  defp join_form(assigns) do
-    ~H"""
-    <.simple_form for={%{}} phx-submit="join-lobby">
-      <.input name="id" label="Game ID" value="" required />
-      <:actions>
-        <.button>Join Game</.button>
-      </:actions>
-    </.simple_form>
+    <.join_lobby_form />
     """
   end
 
@@ -42,7 +32,7 @@ defmodule GolfWeb.HomeLive do
   @impl true
   def handle_event("join-game", %{"id" => link_id}, socket)
       when byte_size(link_id) != @link_length do
-    {:noreply, put_flash(socket, :error, "Game not found.")}
+    {:noreply, put_flash(socket, :error, "Game #{link_id} not found.")}
   end
 
   @impl true
