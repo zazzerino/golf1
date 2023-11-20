@@ -3,6 +3,8 @@ defmodule Golf.Users do
 
   alias Golf.Repo
   alias Golf.Users.User
+  alias Golf.Links.Link
+  alias Golf.Games.{Game, Player}
 
   @default_name "user"
 
@@ -25,5 +27,20 @@ defmodule Golf.Users do
     user
     |> User.changeset(attrs)
     |> Repo.update()
+  end
+
+  def get_links(user_id) do
+    from(u in User,
+      where: [id: ^user_id],
+      join: p in Player,
+      on: [user_id: u.id],
+      join: g in Game,
+      on: [id: p.game_id],
+      order_by: [desc: g.inserted_at],
+      join: l in Link,
+      on: g.id == l.game_id,
+      select: l
+    )
+    |> Repo.all()
   end
 end

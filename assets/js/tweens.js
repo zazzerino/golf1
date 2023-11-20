@@ -1,7 +1,8 @@
 import { Easing, Tween } from "@tweenjs/tween.js";
 
 import { 
-  rotationAt, CENTER_X, DECK_X, DECK_Y, DECK_Y_OFFSET, TABLE_CARD_X, TABLE_CARD_Y, HAND_SIZE 
+  rotationAt, 
+  CENTER_X, DECK_X, DECK_Y, DECK_Y_OFFSET, TABLE_CARD_X, TABLE_CARD_Y, HAND_SIZE 
 } from "./game_canvas";
 
 export function tweenHand(pos, handSprites) {
@@ -20,9 +21,9 @@ export function tweenHand(pos, handSprites) {
     sprite.rotation = 0;
 
     const tween = new Tween(sprite)
-      .to({ x, y, rotation })
+      .to({ x, y, rotation }, 800)
       .easing(Easing.Cubic.InOut)
-      .delay((HAND_SIZE - 1 - i) * 180);
+      .delay((HAND_SIZE-1-i) * 120);
 
     tweens.push(tween);
   }
@@ -32,7 +33,7 @@ export function tweenHand(pos, handSprites) {
 
 export function tweenDeck(deckSprite) {
   return new Tween(deckSprite)
-    .to({ x: DECK_X }, 200)
+    .to({ x: DECK_X }, 180)
     .easing(Easing.Quadratic.Out);
 }
 
@@ -40,7 +41,7 @@ export function tweenTableDeck(tableSprite) {
   tableSprite.x = DECK_X;
 
   return new Tween(tableSprite)
-    .to({ x: TABLE_CARD_X }, 400)
+    .to({ x: TABLE_CARD_X }, 350)
     .easing(Easing.Quadratic.Out);
 }
 
@@ -55,7 +56,6 @@ export function tweenHeldDeck(pos, heldSprite, deckSprite) {
 
   return new Tween(heldSprite)
     .to({ x, y, rotation }, 800)
-    .delay(150)
     .easing(Easing.Quadratic.InOut);
 }
 

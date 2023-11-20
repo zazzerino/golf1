@@ -53,6 +53,10 @@ defmodule Golf.Links do
     end
   end
 
+  def get_link_by_game_id(game_id) do
+    Repo.get_by(Link, game_id: game_id)
+  end
+
   def new_link(lobby_id) do
     %Link{
       id: gen_id(),

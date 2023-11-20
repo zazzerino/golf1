@@ -25,4 +25,10 @@ defmodule Golf do
   def broadcast_from(topic, msg) when is_binary(topic) do
     Phoenix.PubSub.broadcast_from(Golf.PubSub, self(), topic, msg)
   end
+
+  @inserted_at_format "%y/%m/%d %H:%m:%S"
+
+  def format_time(dt) do
+    Calendar.strftime(dt, @inserted_at_format)
+  end
 end

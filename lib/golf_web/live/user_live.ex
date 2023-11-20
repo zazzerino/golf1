@@ -5,9 +5,10 @@ defmodule GolfWeb.UserLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <h2>User Settings</h2>
+    <h2 class="font-bold mb-2">User Settings</h2>
     <div>User(id=<%= @user.id %>)</div>
     <.username_form form={@name_form} />
+    <.links_table :if={@links != []} links={@links} />
     """
   end
 
@@ -22,14 +23,57 @@ defmodule GolfWeb.UserLive do
     """
   end
 
+  def links_table(assigns) do
+    ~H"""
+    <div class="mt-4 overflow-y-auto max-h-[350px]">
+      <h3 class="font-bold mb-2">Games</h3>
+      <table class="w-[20rem]">
+        <thead class="text-sm text-left">
+          <tr>
+            <th>ID</th>
+            <th>Created At</th>
+          </tr>
+        </thead>
+        <tbody class="text-left divide-y">
+          <tr
+            :for={link <- @links}
+            phx-click="link-row-click"
+            phx-value-link={link.id}
+            class="divide-x hover:cursor-pointer"
+          >
+            <td><%= link.id %></td>
+            <td><%= link.inserted_at %></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    """
+  end
+
   @impl true
   def mount(_params, _session, %{assigns: %{user: user}} = socket) do
+    if connected?(socket) do
+      send(self(), :load_links)
+    end
+
     {:ok,
      assign(socket,
        page_title: "User",
        user: user,
-       name_form: to_form(User.changeset(user))
+       name_form: to_form(User.changeset(user)),
+       links: []
      )}
+  end
+
+  @impl true
+  def handle_info(:load_links, socket) do
+    links =
+      socket.assigns.user.id
+      |> Golf.Users.get_links()
+      |> Enum.map(&Map.take(&1, [:id, :inserted_at]))
+      |> Enum.map(&Map.update!(&1, :inserted_at, fn dt -> Golf.format_time(dt) end))
+
+    {:noreply, assign(socket, links: links)}
   end
 
   @impl true
@@ -66,4 +110,19 @@ defmodule GolfWeb.UserLive do
      |> assign(user: user, name_form: to_form(User.changeset(user)))
      |> put_flash(:info, "Username updated.")}
   end
+
+  @impl true
+  def handle_event("link-row-click", %{"link" => link}, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/game/#{link}")}
+  end
 end
+
+  # def links_table(assigns) do
+  #   ~H"""
+  #   <.table id="links-table" rows={@links} row_click={fn _ -> "link-row-click" end}>
+  #     <:col :let={link} label="ID">
+  #       <%= link.id %>
+  #     </:col>
+  #   </.table>
+  #   """
+  # end

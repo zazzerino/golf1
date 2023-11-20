@@ -2,12 +2,17 @@ import * as PIXI from "pixi.js";
 import { update as updateTweens } from "@tweenjs/tween.js";
 
 import {
-  GAME_WIDTH, GAME_HEIGHT, DECK_X, TABLE_CARD_X, TABLE_CARD_Y, handCardCoord, heldCardCoord
+  GAME_WIDTH, GAME_HEIGHT, TABLE_CARD_X, TABLE_CARD_Y, 
+  handCardCoord, heldCardCoord
 } from "./game_canvas";
 
 import {
   makeCardSprite, makeDeckSprite, makePlayable, makeTableSprite, makeUnplayable
 } from "./sprites";
+
+import { 
+  tweenDeck, tweenHand, tweenHeldDeck, tweenHeldTable, tweenTableDeck
+} from "./tweens";
 
 const HAND_SIZE = 6;
 
@@ -150,28 +155,26 @@ export class GameContext {
   onRoundStart(game) {
     this.game = game;
 
-    this.sprites.deck.x = DECK_X;
-    this.addTableCards();
-
     for (const player of this.game.players) {
       this.addHand(player);
+      const pos = player.position;
 
-      //   tweenHand(player.position, this.sprites.hands[player.position])
-      //     .forEach((tween, i) => {
-      //       tween.start();
+      tweenHand(pos, this.sprites.hands[pos])
+        .forEach((tween, i) => {
+          tween.start();
 
-      //       // start tweening the deck half way through the hand tweens
-      //       if (i === HAND_SIZE / 2) {
-      //         tween.onComplete(() => {
-      //           tweenDeck(this.sprites.deck)
-      //             .start()
-      //             .onComplete(() => {
-      //               this.addTableCards();
-      //               tweenTableDeck(this.sprites.table[0]).start();
-      //             });
-      //         });
-      //       }
-      //     });
+          // start tweening the deck after dealing the first row
+          if (i === 2) {
+            tween.onComplete(() => {
+              tweenDeck(this.sprites.deck)
+                .start()
+                .onComplete(() => {
+                  this.addTableCards();
+                  tweenTableDeck(this.sprites.table[0]).start();
+                });
+            });
+          }
+        });
     }
   }
 
@@ -219,8 +222,7 @@ export class GameContext {
       makePlayable(this.sprites.deck, this.onDeckClick.bind(this));
     }
 
-    // a player could flip a hand card before the table card is drawn
-    // so we also need to check if it exists
+    // a player could flip a hand card before the table card is drawn so we also need to check if it exists
     if (this.sprites.table[0] && this.isPlayable("table")) {
       makePlayable(this.sprites.table[0], this.onTableClick.bind(this));
     }
@@ -232,7 +234,7 @@ export class GameContext {
 
     const heldSprite = this.addHeldCard(player);
 
-    // tweenHeldDeck(player.position, heldSprite, this.sprites.deck).start();
+    tweenHeldDeck(player.position, heldSprite, this.sprites.deck).start();
 
     if (player.id === this.game.playerId) {
       makePlayable(heldSprite, this.onHeldClick.bind(this));
@@ -255,8 +257,8 @@ export class GameContext {
 
     const heldSprite = this.addHeldCard(player);
     const tableSprite = this.sprites.table.shift();
-    tableSprite.visible = false;
-    // tweenHeldTable(player.position, heldSprite, tableSprite).start();
+    
+    tweenHeldTable(player.position, heldSprite, tableSprite).start();
 
     if (player.id === this.game.playerId) {
       makeUnplayable(this.sprites.deck);
@@ -326,10 +328,7 @@ export class GameContext {
           this.sprites.table[1] = table1;
           this.stage.addChild(table1);
 
-          // redraw the first table card so it's on top
-          table0.visible = false;
           makeUnplayable(table0);
-
           table0 = makeCardSprite(texture0, TABLE_CARD_X, TABLE_CARD_Y);
           this.sprites.table[0] = table0;
           this.stage.addChild(table0);
