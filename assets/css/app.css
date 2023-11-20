@@ -11,31 +11,31 @@
 
 .player-score {
   position: absolute;
-  /* font-size: 65%; */
   color: gold;
+  /* font-size: 10px; */
+  font-size: 24px;
+  /* font-size: 30px; */
 }
 
 .player-score.bottom {
-  top: 96%;
-  left: 10%;
-  transform: translateX(-50%) translateY(-50%);
+  top: calc(100% - 8px);
+  left: 12px;
+  transform: translateY(-100%);
 }
 
 .player-score.top {
-  top: 4%;
-  /* left: 80%; */
-  left: 10%;
-  transform: translateX(-50%) translateY(-50%);
+  top: 8px;
+  left: 12px;
 }
 
 .player-score.left {
-  top: 29%;
-  left: 10%;
-  transform: translateX(-50%) translateY(-50%);
+  top: 170px;
+  left: 12px;
+  transform: translateY(-50%);
 }
 
 .player-score.right {
-  top: 29%;
-  left: 75%;
-  transform: translateX(-50%) translateY(-50%);
+  top: 170px;
+  left: 405px;
+  transform: translateY(-50%);
 }

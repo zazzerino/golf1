@@ -56,7 +56,7 @@ export function heldCardCoord(pos, yPad = HAND_Y_PAD) {
 
     case "left":
       x = CARD_HEIGHT + yPad;
-      y = CENTER_Y + CARD_WIDTH * 2.5;
+      y = CENTER_Y + CARD_WIDTH * 2.75;
       break;
 
     case "top":
@@ -66,7 +66,7 @@ export function heldCardCoord(pos, yPad = HAND_Y_PAD) {
 
     case "right":
       x = GAME_WIDTH - CARD_HEIGHT - yPad;
-      y = CENTER_Y - CARD_WIDTH * 2.5
+      y = CENTER_Y - CARD_WIDTH * 2.75
       break;
   }
 

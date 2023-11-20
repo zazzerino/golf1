@@ -24,7 +24,7 @@ defmodule GolfWeb.LobbyLive do
       Join
     </.button>
 
-    <p class="mt-4" :if={@lobby && !@host?}>
+    <p :if={@lobby && !@host?} class="mt-4">
       Waiting for host to start game...
     </p>
     """

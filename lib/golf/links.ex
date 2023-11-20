@@ -80,7 +80,7 @@ defmodule Golf.Links do
       # update 1, return nothing
       {1, nil} =
         from(l in Link, where: [id: ^link_id])
-        |> Repo.update_all([set: [game_id: game.id]])
+        |> Repo.update_all(set: [game_id: game.id])
 
       game
     end)

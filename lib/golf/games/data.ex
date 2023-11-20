@@ -20,29 +20,29 @@ defmodule Golf.Games.Data do
 
   def from(game, user_id) do
     index = Enum.find_index(game.players, &(&1.user_id == user_id))
-    player = index && Enum.at(game.players, index)
+    player = if index, do: Enum.at(game.players, index)
 
     num_players = length(game.players)
     positions = hand_positions(num_players)
 
     round = Games.current_round(game)
-    hands = if round, do: Golf.maybe_rotate(round.hands, index)
-
-    players =
-      game.players
-      |> Golf.maybe_rotate(index)
-      |> Games.put_positions(positions)
-      |> Games.put_scores(hands)
-      |> Enum.map(&put_username/1)
-      |> put_hands(hands)
-      |> put_held_card(round && round.held_card)
+    hands = if round, do: Golf.maybe_rotate(round.hands, index), else: []
+    held_card = if round, do: round.held_card
 
     playable_cards =
-      if round && player do
+      if player && round do
         Games.playable_cards(round, player, num_players)
       else
         []
       end
+
+    players =
+      game.players
+      |> Golf.maybe_rotate(index)
+      |> Enum.zip_with(hands, &put_hand_score/2)
+      |> Enum.zip_with(positions, &Map.put(&1, :position, &2))
+      |> Enum.map(&Map.put(&1, :username, &1.user.name))
+      |> Enum.map(&put_held_card(&1, held_card))
 
     %__MODULE__{
       id: game.id,
@@ -66,26 +66,18 @@ defmodule Golf.Games.Data do
     end
   end
 
-  defp put_hands(players, nil), do: players
-
-  defp put_hands(players, hands) do
-    Enum.zip_with(players, hands, &%{&1 | hand: &2})
+  def put_hand_score(player, nil) do
+    %{player | hand: [], score: 0}
   end
 
-  defp put_held_card(players, nil), do: players
-
-  defp put_held_card(players, held_card) do
-    Enum.map(players, &do_put_held(&1, held_card))
+  def put_hand_score(player, hand) do
+    %{player | hand: hand, score: Games.score(hand)}
   end
 
-  defp do_put_held(%{id: id} = player, %{"player_id" => player_id, "name" => card})
-       when id == player_id do
-    %{player | heldCard: card}
+  defp put_held_card(player, %{"player_id" => card_id} = card)
+       when player.id == card_id do
+    %{player | heldCard: card["name"]}
   end
 
-  defp do_put_held(player, _), do: player
-
-  defp put_username(player) do
-    %{player | username: player.user.name}
-  end
+  defp put_held_card(player, _), do: player
 end

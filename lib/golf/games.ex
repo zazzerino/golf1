@@ -47,18 +47,16 @@ defmodule Golf.Games do
   end
 
   def new_round(%Game{id: game_id, players: players}) do
-    num_players = length(players)
     deck = Enum.shuffle(new_deck(@num_decks))
+    num_hand_cards = @hand_size * length(players)
 
-    num_hand_cards = @hand_size * num_players
     {:ok, hand_cards, deck} = deal_from_deck(deck, num_hand_cards)
+    {:ok, table_card, deck} = deal_from_deck(deck)
 
     hands =
       hand_cards
       |> Enum.map(&%{"name" => &1, "face_up?" => false})
       |> Enum.chunk_every(@hand_size)
-
-    {:ok, table_card, deck} = deal_from_deck(deck)
 
     %Round{
       game_id: game_id,
@@ -327,24 +325,10 @@ defmodule Golf.Games do
     end
   end
 
-  # TODO find a better name
   defp places(:take, true, hand), do: [:deck, :table] ++ face_down_cards(hand)
   defp places(:take, false, _), do: [:deck, :table]
   defp places(:flip, _, hand), do: face_down_cards(hand)
   defp places(:hold, _, _), do: [:held, :hand_0, :hand_1, :hand_2, :hand_3, :hand_4, :hand_5]
-
-  def put_positions(players, positions) do
-    Enum.zip_with(players, positions, fn p, pos -> %{p | position: pos} end)
-  end
-
-  # if there aren't any hands, give each player a score of 0
-  def put_scores(players, nil) do
-    Enum.map(players, &%{&1 | score: 0})
-  end
-
-  def put_scores(players, hands) do
-    Enum.zip_with(players, hands, &%{&1 | score: score(&2)})
-  end
 
   def score(hand) do
     hand
@@ -368,18 +352,18 @@ defmodule Golf.Games do
     end
   end
 
-  defp rank_value(<<rank, _>>), do: rank_value(rank)
-
   defp rank_if_face_up(%{"face_up?" => true, "name" => <<rank, _>>}), do: rank
   defp rank_if_face_up(_), do: nil
 
   # Each hand consists of two rows of three cards.
   # Face down cards are represented by nil and ignored.
   # If the cards are face up and in a matching column, they are worth 0 points and are discarded.
+
   # Special cases:
   #   6 of a kind -> -40 pts
   #   4 of a kind (outer cols) -> -20 pts
   #   4 of a kind (adj cols) -> -10 pts
+
   # The rank value of each remaining face up card is totaled together.
   defp score_ranks(ranks, total) do
     case ranks do

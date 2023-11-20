@@ -1,7 +1,7 @@
 defmodule GolfWeb.HomeLive do
   use GolfWeb, :live_view
 
-  @id_length 6
+  @link_length 6
 
   @impl true
   def render(assigns) do
@@ -9,7 +9,7 @@ defmodule GolfWeb.HomeLive do
     <h2>Home</h2>
     <p>Hello <%= @user.name %>(id=<%= @user.id %>)</p>
 
-    <.button class="mt-4 mb-4" phx-click="create-lobby">
+    <.button class="my-2" phx-click="create-lobby">
       Create Game
     </.button>
 
@@ -41,7 +41,7 @@ defmodule GolfWeb.HomeLive do
 
   @impl true
   def handle_event("join-game", %{"id" => link_id}, socket)
-      when byte_size(link_id) != @id_length do
+      when byte_size(link_id) != @link_length do
     {:noreply, put_flash(socket, :error, "Game not found.")}
   end
 
